@@ -1,0 +1,1211 @@
+# Qin书输入法内置拼音词库（高频单字与常用词组，支持全拼、简拼与12组模糊音）
+# 格式：词条<TAB>带空格拼音<TAB>权重
+# 可通过设置面板或 dict_importer.py 导入外部 Rime luna_pinyin.dict.yaml 大词库扩展
+
+# === 高频单字 ===
+啊	a	1200
+爱	ai	1800
+安	an	1900
+按	an	1600
+昂	ang	1200
+奥	ao	1200
+把	ba	1900
+吧	ba	1700
+八	ba	1600
+白	bai	1800
+百	bai	1700
+班	ban	1500
+半	ban	1600
+办	ban	1700
+帮	bang	1700
+包	bao	1700
+报	bao	1800
+保	bao	1700
+北	bei	1900
+被	bei	1800
+备	bei	1500
+本	ben	1900
+比	bi	1900
+笔	bi	1800
+必	bi	1700
+编	bian	1600
+变	bian	1800
+边	bian	1700
+标	biao	1700
+表	biao	1800
+别	bie	1700
+并	bing	1800
+病	bing	1500
+波	bo	1500
+不	bu	2500
+部	bu	1900
+步	bu	1700
+才	cai	1900
+财	cai	1700
+参	can	1600
+藏	cang	1400
+草	cao	1500
+策	ce	1600
+层	ceng	1600
+查	cha	1800
+差	cha	1600
+产	chan	1900
+长	chang	1900
+常	chang	1800
+场	chang	1800
+超	chao	1700
+车	che	1800
+陈	chen	1700
+称	cheng	1600
+成	cheng	2000
+程	cheng	1900
+城	cheng	1700
+吃	chi	1800
+持	chi	1700
+重	chong	1800
+出	chu	2100
+处	chu	1800
+初	chu	1600
+传	chuan	1700
+创	chuang	1700
+春	chun	1600
+纯	chun	1500
+词	ci	1800
+此	ci	1800
+次	ci	1900
+从	cong	1900
+错	cuo	1700
+大	da	2300
+打	da	1900
+达	da	1700
+答	da	1600
+代	dai	1800
+带	dai	1700
+单	dan	1800
+但	dan	2000
+当	dang	1900
+到	dao	2200
+道	dao	1900
+导	dao	1700
+的	de	2800
+得	de	2000
+等	deng	1900
+地	di	2100
+第	di	1900
+低	di	1700
+点	dian	2000
+电	dian	2000
+掉	diao	1600
+定	ding	2000
+东	dong	1900
+动	dong	1900
+都	dou	2100
+读	du	1700
+度	du	1800
+端	duan	1600
+断	duan	1600
+对	dui	2100
+队	dui	1700
+多	duo	2100
+额	e	1400
+而	er	1900
+二	er	1800
+发	fa	2100
+法	fa	2000
+反	fan	1800
+返	fan	1600
+方	fang	1900
+放	fang	1800
+防	fang	1600
+非	fei	1800
+费	fei	1700
+分	fen	2000
+风	feng	1800
+服	fu	1800
+福	fu	1700
+复	fu	1800
+副	fu	1600
+改	gai	1800
+该	gai	1800
+干	gan	1800
+感	gan	1900
+刚	gang	1700
+高	gao	2000
+告	gao	1700
+个	ge	2400
+各	ge	1800
+格	ge	1700
+哥	ge	1600
+给	gei	2000
+根	gen	1800
+跟	gen	1700
+更	geng	1900
+工	gong	2000
+公	gong	1900
+功	gong	1800
+共	gong	1800
+购	gou	1700
+构	gou	1700
+够	gou	1700
+股	gu	1900
+古	gu	1600
+固	gu	1600
+关	guan	2000
+管	guan	1900
+观	guan	1700
+光	guang	1800
+广	guang	1800
+规	gui	1700
+归	gui	1600
+国	guo	2200
+过	guo	2100
+果	guo	1900
+还	hai	2000
+海	hai	1900
+汉	han	1800
+行	hang	1800
+好	hao	2300
+号	hao	1900
+和	he	2300
+合	he	1900
+核	he	1700
+黑	hei	1600
+很	hen	2100
+红	hong	1800
+宏	hong	1600
+后	hou	2000
+呼	hu	1600
+湖	hu	1700
+户	hu	1800
+护	hu	1700
+互	hu	1700
+花	hua	1700
+化	hua	1900
+话	hua	1900
+画	hua	1700
+划	hua	1600
+欢	huan	1700
+换	huan	1800
+黄	huang	1700
+回	hui	2000
+会	hui	2200
+混	hun	1700
+活	huo	1900
+火	huo	1700
+或	huo	1800
+机	ji	2100
+基	ji	1800
+及	ji	1800
+级	ji	1800
+极	ji	1800
+即	ji	1700
+集	ji	1700
+计	ji	1900
+记	ji	1900
+技	ji	1800
+继	ji	1800
+家	jia	2100
+加	jia	1900
+价	jia	1800
+间	jian	2000
+建	jian	1900
+见	jian	1900
+件	jian	1900
+简	jian	1800
+检	jian	1700
+将	jiang	1900
+江	jiang	1800
+讲	jiang	1700
+降	jiang	1700
+交	jiao	1900
+叫	jiao	1700
+较	jiao	1700
+教	jiao	1700
+接	jie	1900
+结	jie	1900
+解	jie	1900
+界	jie	1800
+今	jin	2000
+金	jin	1900
+进	jin	2000
+近	jin	1800
+经	jing	2100
+京	jing	1900
+精	jing	1800
+景	jing	1700
+就	jiu	2300
+九	jiu	1700
+久	jiu	1700
+居	ju	1600
+局	ju	1700
+具	ju	1800
+据	ju	1900
+句	ju	1700
+决	jue	1800
+绝	jue	1600
+军	jun	1600
+开	kai	2100
+看	kan	2100
+考	kao	1700
+科	ke	1900
+可	ke	2200
+客	ke	1800
+课	ke	1700
+克	ke	1600
+肯	ken	1600
+空	kong	1900
+控	kong	1800
+口	kou	1800
+苦	ku	1600
+库	ku	1800
+快	kuai	1900
+款	kuan	1700
+框	kuang	1700
+况	kuang	1700
+亏	kui	1600
+困	kun	1600
+扩	kuo	1700
+拉	la	1700
+来	lai	2200
+兰	lan	1600
+蓝	lan	1700
+览	lan	1600
+老	lao	1900
+了	le	2600
+乐	le	1800
+类	lei	1800
+冷	leng	1600
+离	li	1800
+理	li	2000
+里	li	2000
+力	li	1900
+立	li	1800
+利	li	1900
+例	li	1700
+历	li	1700
+连	lian	1800
+联	lian	1800
+脸	lian	1600
+良	liang	1700
+两	liang	2000
+量	liang	1900
+亮	liang	1700
+聊	liao	1600
+料	liao	1700
+列	lie	1800
+林	lin	1700
+临	lin	1700
+灵	ling	1700
+零	ling	1700
+领	ling	1700
+另	ling	1700
+流	liu	1900
+留	liu	1700
+六	liu	1700
+龙	long	1700
+楼	lou	1600
+路	lu	1900
+录	lu	1800
+陆	lu	1700
+率	lv	1700
+绿	lv	1700
+乱	luan	1600
+论	lun	1800
+落	luo	1800
+逻	luo	1600
+妈	ma	1700
+码	ma	1900
+马	ma	1800
+吗	ma	1800
+买	mai	1900
+卖	mai	1800
+满	man	1800
+慢	man	1700
+忙	mang	1700
+毛	mao	1600
+贸	mao	1600
+么	me	2000
+没	mei	2200
+每	mei	1900
+美	mei	1900
+门	men	1800
+们	men	2200
+梦	meng	1600
+米	mi	1700
+密	mi	1700
+面	mian	2000
+免	mian	1700
+秒	miao	1600
+民	min	1900
+明	ming	2000
+名	ming	1900
+命	ming	1700
+模	mo	1900
+默	mo	1700
+某	mou	1700
+木	mu	1700
+目	mu	1900
+那	na	2100
+拿	na	1700
+哪	na	1800
+内	nei	1900
+南	nan	1900
+男	nan	1800
+难	nan	1800
+脑	nao	1800
+呢	ne	1800
+能	neng	2200
+你	ni	2400
+拟	ni	1600
+年	nian	2100
+念	nian	1600
+鸟	niao	1500
+您	nin	1800
+牛	niu	1700
+农	nong	1600
+弄	nong	1600
+努	nu	1600
+女	nv	1800
+暖	nuan	1600
+哦	o	1500
+偶	ou	1500
+拍	pai	1700
+排	pai	1800
+派	pai	1700
+盘	pan	1800
+判	pan	1700
+旁	pang	1600
+跑	pao	1700
+配	pei	1800
+朋	peng	1800
+批	pi	1800
+皮	pi	1600
+片	pian	1800
+偏	pian	1600
+票	piao	1900
+品	pin	1900
+拼	pin	1900
+频	pin	1800
+平	ping	1900
+屏	ping	1700
+评	ping	1700
+破	po	1700
+普	pu	1800
+七	qi	1800
+期	qi	1900
+起	qi	2100
+企	qi	1700
+启	qi	1800
+气	qi	1800
+器	qi	1800
+千	qian	1800
+前	qian	2000
+钱	qian	1900
+签	qian	1700
+强	qiang	1800
+桥	qiao	1600
+切	qie	1800
+且	qie	1700
+亲	qin	1700
+秦	qin	2000
+勤	qin	1600
+青	qing	1700
+清	qing	1900
+轻	qing	1700
+情	qing	1900
+请	qing	2000
+秋	qiu	1600
+求	qiu	1900
+球	qiu	1700
+区	qu	1900
+取	qu	1900
+去	qu	2100
+趣	qu	1600
+全	quan	2000
+权	quan	1800
+券	quan	1700
+确	que	1900
+缺	que	1700
+群	qun	1700
+然	ran	2000
+让	rang	2000
+热	re	1800
+人	ren	2400
+认	ren	1900
+任	ren	1900
+日	ri	2000
+容	rong	1900
+融	rong	1700
+肉	rou	1600
+如	ru	2000
+入	ru	2000
+软	ruan	1900
+若	ruo	1700
+三	san	2000
+散	san	1600
+扫	sao	1600
+色	se	1800
+杀	sha	1600
+山	shan	1800
+删	shan	1700
+商	shang	1900
+上	shang	2300
+尚	shang	1600
+少	shao	1900
+烧	shao	1600
+设	she	1900
+社	she	1800
+涉	she	1600
+身	shen	1900
+深	shen	1900
+神	shen	1700
+审	shen	1700
+什	shen	2000
+生	sheng	2100
+升	sheng	1800
+声	sheng	1800
+省	sheng	1800
+胜	sheng	1700
+师	shi	1800
+十	shi	2000
+时	shi	2200
+实	shi	2000
+识	shi	1800
+史	shi	1700
+使	shi	2000
+始	shi	1900
+市	shi	2000
+事	shi	2100
+试	shi	1800
+是	shi	2700
+示	shi	1800
+世	shi	1900
+收	shou	1900
+手	shou	2000
+守	shou	1700
+首	shou	1800
+受	shou	1800
+书	shu	2100
+输	shu	2000
+数	shu	2000
+属	shu	1700
+术	shu	1800
+述	shu	1600
+刷	shua	1600
+双	shuang	1800
+水	shui	1900
+谁	shui	1800
+税	shui	1700
+顺	shun	1700
+说	shuo	2200
+司	si	1800
+思	si	1900
+私	si	1700
+四	si	1900
+似	si	1700
+送	song	1800
+搜	sou	1700
+苏	su	1700
+速	su	1800
+素	su	1600
+算	suan	1900
+虽	sui	1800
+随	sui	1800
+岁	sui	1700
+损	sun	1700
+所	suo	2000
+索	suo	1700
+锁	suo	1700
+他	ta	2300
+她	ta	2100
+它	ta	1900
+台	tai	1900
+太	tai	1900
+态	tai	1800
+谈	tan	1700
+探	tan	1700
+套	tao	1700
+讨	tao	1700
+特	te	1900
+提	ti	2000
+题	ti	1900
+体	ti	2000
+替	ti	1700
+天	tian	2100
+添	tian	1700
+田	tian	1700
+条	tiao	1900
+调	tiao	1900
+跳	tiao	1700
+贴	tie	1600
+铁	tie	1600
+听	ting	1900
+停	ting	1800
+通	tong	2000
+同	tong	2100
+统	tong	1900
+头	tou	1900
+投	tou	1900
+透	tou	1700
+突	tu	1700
+图	tu	1900
+土	tu	1700
+团	tuan	1700
+推	tui	1900
+退	tui	1800
+托	tuo	1600
+外	wai	2000
+完	wan	2000
+玩	wan	1700
+晚	wan	1800
+万	wan	2000
+王	wang	1900
+网	wang	2000
+往	wang	1800
+望	wang	1800
+微	wei	1800
+危	wei	1600
+维	wei	1800
+为	wei	2300
+围	wei	1700
+委	wei	1700
+未	wei	1900
+位	wei	2000
+味	wei	1700
+温	wen	1700
+文	wen	2100
+闻	wen	1700
+稳	wen	1800
+问	wen	2000
+我	wo	2600
+握	wo	1700
+无	wu	2100
+五	wu	2000
+午	wu	1700
+物	wu	1900
+务	wu	1900
+误	wu	1700
+西	xi	1900
+吸	xi	1600
+希	xi	1800
+息	xi	1800
+习	xi	1900
+喜	xi	1800
+洗	xi	1600
+系	xi	2000
+细	xi	1800
+下	xia	2200
+夏	xia	1700
+先	xian	2000
+显	xian	1900
+现	xian	2100
+线	xian	1900
+限	xian	1800
+相	xiang	2000
+香	xiang	1700
+详	xiang	1800
+想	xiang	2100
+响	xiang	1800
+向	xiang	1900
+项	xiang	1900
+象	xiang	1800
+像	xiang	1900
+消	xiao	1900
+小	xiao	2200
+效	xiao	1800
+校	xiao	1700
+笑	xiao	1700
+些	xie	2000
+协	xie	1700
+写	xie	2000
+谢	xie	1900
+心	xin	2100
+新	xin	2100
+信	xin	2000
+星	xing	1800
+兴	xing	1700
+行	xing	2000
+形	xing	1800
+型	xing	1800
+性	xing	1900
+姓	xing	1600
+修	xiu	1800
+休	xiu	1700
+需	xu	1900
+许	xu	1800
+序	xu	1900
+续	xu	1800
+选	xuan	2000
+宣	xuan	1600
+学	xue	2100
+雪	xue	1600
+寻	xun	1700
+询	xun	1700
+迅	xun	1600
+压	ya	1700
+亚	ya	1700
+言	yan	1800
+研	yan	1800
+严	yan	1700
+延	yan	1700
+眼	yan	1800
+演	yan	1700
+验	yan	1900
+阳	yang	1800
+样	yang	2100
+养	yang	1700
+要	yao	2300
+邀	yao	1600
+也	ye	2300
+业	ye	2000
+页	ye	1900
+夜	ye	1700
+一	yi	2700
+医	yi	1700
+依	yi	1700
+移	yi	1700
+已	yi	2100
+以	yi	2300
+亿	yi	1800
+义	yi	1800
+议	yi	1800
+易	yi	1900
+意	yi	2000
+异	yi	1700
+因	yi	1200
+因	yin	2000
+音	yin	1900
+银	yin	1800
+引	yin	1800
+印	yin	1700
+英	ying	2000
+应	ying	2000
+盈	ying	1700
+营	ying	1800
+影	ying	1800
+硬	ying	1700
+拥	yong	1700
+永	yong	1700
+用	yong	2200
+优	you	1800
+由	you	1900
+游	you	1800
+邮	you	1700
+友	you	1900
+有	you	2500
+又	you	2000
+右	you	1800
+于	yu	2000
+余	yu	1700
+鱼	yu	1600
+与	yu	2000
+语	yu	2000
+雨	yu	1700
+预	yu	1800
+域	yu	1700
+遇	yu	1700
+元	yuan	1900
+原	yuan	1900
+员	yuan	1900
+园	yuan	1700
+源	yuan	1800
+远	yuan	1800
+院	yuan	1800
+愿	yuan	1800
+月	yue	2000
+越	yue	1900
+约	yue	1800
+阅	yue	1700
+云	yun	1800
+允	yun	1700
+运	yun	1900
+杂	za	1600
+在	zai	2500
+再	zai	2000
+载	zai	1800
+暂	zan	1700
+早	zao	1800
+造	zao	1800
+则	ze	1800
+责	ze	1800
+择	ze	1800
+怎	zen	1900
+增	zeng	1900
+展	zhan	1900
+占	zhan	1800
+战	zhan	1800
+站	zhan	1800
+张	zhang	1900
+涨	zhang	1900
+掌	zhang	1700
+账	zhang	1900
+找	zhao	1900
+照	zhao	1800
+着	zhe	2000
+这	zhe	2500
+者	zhe	1900
+真	zhen	2000
+针	zhen	1700
+阵	zhen	1600
+震	zhen	1600
+争	zheng	1800
+整	zheng	1900
+正	zheng	2100
+政	zheng	1900
+证	zheng	1900
+之	zhi	2100
+支	zhi	2000
+知	zhi	2000
+织	zhi	1700
+直	zhi	2000
+值	zhi	1900
+职	zhi	1800
+指	zhi	1900
+止	zhi	1800
+只	zhi	2100
+至	zhi	1900
+制	zhi	1900
+质	zhi	1800
+置	zhi	1900
+中	zhong	2300
+终	zhong	1800
+种	zhong	1900
+众	zhong	1700
+重	zhong	2000
+周	zhou	1900
+州	zhou	1800
+主	zhu	2100
+助	zhu	1800
+注	zhu	1900
+住	zhu	1900
+抓	zhua	1700
+专	zhuan	1900
+转	zhuan	1900
+装	zhuang	1900
+状	zhuang	1800
+追	zhui	1700
+准	zhun	1900
+桌	zhuo	1700
+资	zi	2000
+字	zi	2000
+自	zi	2200
+宗	zong	1600
+综	zong	1800
+总	zong	2000
+走	zou	1900
+组	zu	1900
+足	zu	1800
+最	zui	2100
+昨	zuo	1800
+左	zuo	1800
+作	zuo	2100
+做	zuo	2100
+坐	zuo	1800
+
+# === 高频常用词组（覆盖日常、办公、技术、财经与模糊音高频词） ===
+秦书	qin shu	3500
+输入法	shu ru fa	3200
+万能五笔	wan neng wu bi	3200
+五笔	wu bi	3000
+拼音	pin yin	3000
+模糊音	mo hu yin	3000
+中文	zhong wen	2900
+英文	ying wen	2900
+中英文	zhong ying wen	2800
+中国	zhong guo	3100
+人民	ren min	2800
+北京	bei jing	2900
+上海	shang hai	2900
+深圳	shen zhen	2800
+广州	guang zhou	2800
+南京	nan jing	2800
+杭州	hang zhou	2700
+成都	cheng du	2700
+重庆	chong qing	2700
+武汉	wu han	2700
+西安	xi an	2700
+苏州	su zhou	2700
+湖南	hu nan	2700
+福建	fu jian	2700
+四川	si chuan	2700
+你好	ni hao	3000
+谢谢	xie xie	2900
+不客气	bu ke qi	2600
+对不起	dui bu qi	2700
+没关系	mei guan xi	2700
+早上好	zao shang hao	2600
+晚上好	wan shang hao	2600
+再见	zai jian	2700
+朋友	peng you	2800
+家人	jia ren	2600
+同事	tong shi	2600
+老师	lao shi	2600
+先生	xian sheng	2600
+女士	nv shi	2600
+今天	jin tian	2900
+明天	ming tian	2900
+昨天	zuo tian	2800
+现在	xian zai	2900
+时间	shi jian	2900
+日期	ri qi	2800
+今年	jin nian	2700
+明年	ming nian	2700
+去年	qu nian	2700
+时候	shi hou	2800
+没有	mei you	2900
+可以	ke yi	2900
+什么	shen me	2900
+为什么	wei shen me	2800
+怎么	zen me	2900
+怎么样	zen me yang	2700
+知道	zhi dao	2900
+自己	zi ji	2900
+已经	yi jing	2900
+开始	kai shi	2900
+完成	wan cheng	2900
+继续	ji xu	2800
+支持	zhi chi	2900
+使用	shi yong	2900
+需要	xu yao	2800
+应该	ying gai	2800
+希望	xi wang	2800
+觉得	jue de	2800
+认为	ren wei	2800
+因为	yin wei	2800
+所以	suo yi	2800
+但是	dan shi	2800
+如果	ru guo	2800
+虽然	sui ran	2700
+或者	huo zhe	2800
+而且	er qie	2700
+不过	bu guo	2700
+大家	da jia	2800
+我们	wo men	2900
+你们	ni men	2800
+他们	ta men	2800
+这里	zhe li	2800
+那里	na li	2800
+哪里	na li	2800
+这个	zhe ge	2900
+那个	na ge	2800
+一些	yi xie	2800
+一下	yi xia	2800
+一起	yi qi	2800
+一直	yi zhi	2800
+一定	yi ding	2800
+一般	yi ban	2700
+一样	yi yang	2800
+电脑	dian nao	2800
+手机	shou ji	2800
+软件	ruan jian	2900
+硬件	ying jian	2700
+系统	xi tong	2900
+设置	she zhi	2900
+文件	wen jian	2900
+目录	mu lu	2800
+代码	dai ma	2900
+程序	cheng xu	2900
+编程	bian cheng	2800
+开发	kai fa	2800
+测试	ce shi	2800
+运行	yun xing	2800
+安装	an zhuang	2800
+下载	xia zai	2800
+上传	shang chuan	2800
+备份	bei fen	2800
+同步	tong bu	2800
+网络	wang luo	2800
+数据	shu ju	2900
+数据库	shu ju ku	2700
+接口	jie kou	2700
+功能	gong neng	2800
+版本	ban ben	2800
+更新	geng xin	2800
+升级	sheng ji	2700
+窗口	chuang kou	2700
+候选	hou xuan	2700
+候选词	hou xuan ci	2800
+词库	ci ku	2800
+快捷键	kuai jie jian	2800
+人工智能	ren gong zhi neng	2800
+工作	gong zuo	2900
+学习	xue xi	2900
+生活	sheng huo	2900
+公司	gong si	2800
+项目	xiang mu	2800
+计划	ji hua	2800
+方案	fang an	2800
+报告	bao gao	2800
+会议	hui yi	2800
+问题	wen ti	2900
+解决	jie jue	2800
+方法	fang fa	2800
+经验	jing yan	2700
+结果	jie guo	2800
+效果	xiao guo	2800
+效率	xiao lv	2800
+速度	su du	2800
+质量	zhi liang	2800
+安全	an quan	2800
+稳定	wen ding	2800
+简单	jian dan	2800
+方便	fang bian	2800
+实用	shi yong	2700
+股票	gu piao	2900
+交易	jiao yi	2900
+市场	shi chang	2900
+账户	zhang hu	2900
+持仓	chi cang	2800
+量化	liang hua	2900
+策略	ce lve	2800
+收益	shou yi	2800
+风险	feng xian	2800
+行情	hang qing	2800
+复盘	fu pan	2800
+成交	cheng jiao	2800
+买入	mai ru	2800
+卖出	mai chu	2800
+资金	zi jin	2800
+价格	jia ge	2800
+涨停	zhang ting	2700
+跌停	die ting	2700
+指数	zhi shu	2700
+板块	ban kuai	2700
+自动	zi dong	2800
+智能	zhi neng	2800
+切换	qie huan	2800
+默认	mo ren	2800
+参考	can kao	2800
+生成	sheng cheng	2800
+命名	ming ming	2700
+同时	tong shi	2800
+其余	qi yu	2600
+说明	shuo ming	2800
+蓝天	lan tian	2600
+男人	nan ren	2600
+牛奶	niu nai	2600
+旅游	lv you	2600
+热心	re xin	2600
+快乐	kuai le	2700
+认真	ren zhen	2700
+精神	jing shen	2700
+新闻	xin wen	2700
+星星	xing xing	2600
+联系	lian xi	2700
+良好	liang hao	2700
+关心	guan xin	2700
+光明	guang ming	2700
+明白	ming bai	2800
+清楚	qing chu	2800
+情况	qing kuang	2800
+非常	fei chang	2900
+特别	te bie	2800
+正常	zheng chang	2800
+正式	zheng shi	2800
+重要	zhong yao	2800
+主要	zhu yao	2800
+注意	zhu yi	2800
+准备	zhun bei	2800
+准确	zhun que	2800
+自动上屏	zi dong shang ping	2800
+五笔拼音	wu bi pin yin	2900
+
+# === v2.1.0 扩充高频日常、办公、技术与金融词组 ===
+自定义	zi ding yi	2800
+短语	duan yu	2800
+图标	tu biao	2800
+程序图标	cheng xu tu biao	2700
+任务栏	ren wu lan	2700
+桌面	zhuo mian	2800
+浏览器	liu lan qi	2800
+编辑器	bian ji qi	2800
+终端	zhong duan	2800
+命令行	ming ling hang	2800
+文件夹	wen jian jia	2800
+压缩包	ya suo bao	2700
+服务器	fu wu qi	2800
+客户端	ke hu duan	2800
+本地	ben di	2800
+云端	yun duan	2800
+内存	nei cun	2800
+硬盘	ying pan	2800
+处理器	chu li qi	2700
+显卡	xian ka	2700
+显示器	xian shi qi	2700
+键盘	jian pan	2800
+鼠标	shu biao	2800
+麦克风	mai ke feng	2700
+摄像头	she xiang tou	2700
+微信	wei xin	2900
+支付宝	zhi fu bao	2800
+淘宝	tao bao	2700
+京东	jing dong	2700
+抖音	dou yin	2700
+百度	bai du	2700
+谷歌	gu ge	2800
+微软	wei ruan	2800
+苹果	ping guo	2800
+华为	hua wei	2800
+小米	xiao mi	2800
+比亚迪	bi ya di	2700
+茅台	mao tai	2700
+宁德时代	ning de shi dai	2700
+上证指数	shang zheng zhi shu	2800
+深证成指	shen zheng cheng zhi	2700
+创业板	chuang ye ban	2800
+科创板	ke chuang ban	2800
+北交所	bei jiao suo	2800
+沪深	hu shen	2800
+微盘股	wei pan gu	2800
+小盘股	xiao pan gu	2800
+龙头股	long tou gu	2800
+成交额	cheng jiao e	2800
+换手率	huan shou lv	2800
+市盈率	shi ying lv	2800
+市净率	shi jing lv	2800
+净资产	jing zi chan	2700
+现金流	xian jin liu	2700
+回撤	hui che	2800
+止损	zhi sun	2800
+止盈	zhi ying	2800
+建仓	jian cang	2800
+加仓	jia cang	2800
+减仓	jian cang	2800
+清仓	qing cang	2800
+满仓	man cang	2800
+空仓	kong cang	2800
+低吸	di xi	2800
+高抛	gao pao	2800
+左侧	zuo ce	2800
+右侧	you ce	2800
+分批	fen pi	2800
+委托	wei tuo	2800
+撤单	che dan	2800
+集合竞价	ji he jing jia	2800
+盘中	pan zhong	2800
+盘后	pan hou	2800
+开盘	kai pan	2800
+收盘	shou pan	2800
+午盘	wu pan	2800
+尾盘	wei pan	2800
+分时	fen shi	2800
+日线	ri xian	2800
+周线	zhou xian	2800
+月线	yue xian	2800
+均线	jun xian	2800
+量能	liang neng	2800
+放量	fang liang	2800
+缩量	suo liang	2800
+震荡	zhen dang	2800
+突破	tu po	2800
+反弹	fan tan	2800
+回调	hui tiao	2800
+趋势	qu shi	2800
+周期	zhou qi	2800
+情绪	qing xu	2800
+主线	zhu xian	2800
+题材	ti cai	2800
+概念	gai nian	2800
+基本面	ji ben mian	2800
+技术面	ji shu mian	2800
+资金面	zi jin mian	2800
+消息面	xiao xi mian	2800
+收益率	shou yi lv	2800
+年化	nian hua	2800
+夏普比率	xia pu bi lv	2700
+最大回撤	zui da hui che	2800
+波动率	bo dong lv	2700
+流动性	liu dong xing	2700
+手续费	shou xu fei	2800
+印花税	yin hua shui	2700
+过户费	guo hu fei	2700
+佣金	yong jin	2800
+分红	fen hong	2800
+除权	chu quan	2700
+除息	chu xi	2700
+财报	cai bao	2800
+季报	ji bao	2800
+年报	nian bao	2800
+业绩	ye ji	2800
+预告	yu gao	2800
+快报	kuai bao	2800
+研报	yan bao	2800
+券商	quan shang	2800
+银河证券	yin he zheng quan	2800
+川财证券	chuan cai zheng quan	2800
+国泰海通	guo tai hai tong	2800
+同花顺	tong hua shun	2800
+东方财富	dong fang cai fu	2800
+通达信	tong da xin	2800
+雪球	xue qiu	2700
+飞牛	fei niu	2800
+反重力	fan zhong li	2800
+自动化	zi dong hua	2800
+多线程	duo xian cheng	2800
+并发	bing fa	2800
+协程	xie cheng	2800
+异步	yi bu	2800
+双缓冲	shuang huan chong	2700
+高分屏	gao fen ping	2700
+分辨率	fen bian lv	2800
+快捷键	kuai jie jian	2800
+右键菜单	you jian cai dan	2800
+状态栏	zhuang tai lan	2800
+候选窗	hou xuan chuang	2800
+单实例	dan shi li	2700
+互斥锁	hu chi suo	2700
+配置文件	pei zhi wen jian	2800
+环境变量	huan jing bian liang	2800
+源代码	yuan dai ma	2800
+可执行文件	ke zhi xing wen jian	2700
+安装包	an zhuang bao	2800
+绿色版	lv se ban	2800
+便携版	bian xie ban	2800
+开源	kai yuan	2800
+免费	mian fei	2800
+高效	gao xiao	2800
+流畅	liu chang	2800
+稳定	wen ding	2800
+可靠	ke kao	2800
+简洁	jian jie	2800
+美观	mei guan	2800
+实用	shi yong	2800
+兼容	jian rong	2800
+扩展	kuo zhan	2800
+优化	you hua	2800
+迭代	die dai	2800
+排查	pai cha	2800
+修复	xiu fu	2800
+验证	yan zheng	2800
+交付	jiao fu	2800
+部署	bu shu	2800
+维护	wei hu	2800
+监控	jian kong	2800
+告警	gao jing	2800
+日志	ri zhi	2800
+异常	yi chang	2800
+报错	bao cuo	2800
+超时	chao shi	2800
+重试	chong shi	2800
+回滚	hui gun	2800
+上线	shang xian	2800
+发布	fa bu	2800
+里程碑	li cheng bei	2700
+优先级	you xian ji	2800
+需求	xu qiu	2800
+架构	jia gou	2800
+模块	mo kuai	2800
+组件	zu jian	2800
+协议	xie yi	2800
+加密	jia mi	2800
+解密	jie mi	2800
+签名	qian ming	2800
+证书	zheng shu	2800
+权限	quan xian	2800
+管理员	guan li yuan	2800
+注册表	zhu ce biao	2800
+开机自启	kai ji zi qi	2800
+后台运行	hou tai yun xing	2800
+一键启动	yi jian qi dong	2800
+一键编译	yi jian bian yi	2800
+一键导入	yi jian dao ru	2800

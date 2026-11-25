@@ -1,0 +1,5 @@
+*.exe
+*.syso
+dist/
+build-tsf-x64/
+build-tsf-x86/

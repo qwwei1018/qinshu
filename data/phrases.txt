@@ -1,0 +1,32 @@
+# Qin书输入法自定义短语配置文件 (data/phrases.txt)
+# 修改保存后，右键点击状态栏选择「重新加载词库」即可立即生效！
+#
+# 格式：缩写=短语内容   （或 缩写<TAB>短语内容）
+# 支持动态变量：
+#   $year    四位年份 (如 2026)
+#   $month   两位月份 (如 11)
+#   $day     两位日期 (如 25)
+#   $hour    两位小时 (如 11)
+#   $minute  两位分钟 (如 15)
+#   $second  两位秒数 (如 30)
+#   $weekday 中文星期 (如 星期三)
+#
+# 同一缩写可写多行，按书写顺序排列在候选最前。
+
+qs=Qin书输入法
+qs=QinShu IME
+ok=好的，没问题！
+ok=收到，马上处理。
+thx=谢谢！
+thx=非常感谢您的支持！
+fp=今日复盘：$year-$month-$day（$weekday）
+fp=复盘笔记
+dt=$year-$month-$day $hour:$minute:$second
+dt=$year年$month月$day日 $weekday
+gp=A股微盘量化
+gp=涨停板复盘
+zj=总结：
+bz=备注：
+dz=（请在此填写你的常用收件地址）
+yx=（请在此填写你的常用邮箱地址）
+dh=（请在此填写你的常用联系电话）

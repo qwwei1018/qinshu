@@ -1,0 +1,74 @@
+name: Build QinShu IME (Win11 Native TSF + Go Engine)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-win11:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run Go unit tests
+        run: go test -v ./...
+
+      - name: Embed Windows 11 Icon (qinshu.ico)
+        run: |
+          go install github.com/akavel/rsrc@latest
+          rsrc -arch amd64 -ico assets/qinshu.ico -o cmd/qinshu/rsrc_windows_amd64.syso
+
+      - name: Build Go Engine (Qin书.exe)
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/Qin书 | Out-Null
+          go build -ldflags="-H windowsgui -s -w" -o dist/Qin书/Qin书.exe ./cmd/qinshu
+
+      - name: Build Native TSF COM DLL (x64, Static CRT /MT, ~150KB)
+        run: |
+          cmake -S tsf -B build-tsf-x64 -A x64
+          cmake --build build-tsf-x64 --config Release
+          Copy-Item build-tsf-x64/Release/QinShuTSF.dll dist/Qin书/QinShuTSF_x64.dll
+
+      - name: Build Native TSF COM DLL (x86 for 32-bit Apps, Static CRT /MT)
+        run: |
+          cmake -S tsf -B build-tsf-x86 -A Win32
+          cmake --build build-tsf-x86 --config Release
+          Copy-Item build-tsf-x86/Release/QinShuTSF.dll dist/Qin书/QinShuTSF_x86.dll
+
+      - name: Bundle Data, Assets & Install Scripts
+        run: |
+          Copy-Item -Recurse data dist/Qin书/data
+          Copy-Item -Recurse assets dist/Qin书/assets
+          if (Test-Path README.md) { Copy-Item README.md dist/Qin书/README.md }
+          Copy-Item 安装_Qin书TSF.bat dist/Qin书/安装_Qin书TSF.bat
+          Copy-Item 卸载_Qin书TSF.bat dist/Qin书/卸载_Qin书TSF.bat
+          Copy-Item 下载十万大词库.bat dist/Qin书/下载十万大词库.bat
+          Compress-Archive -Path dist/Qin书/* -DestinationPath dist/QinShu-IME-TSF-Win11-Full.zip -Force
+
+      - name: Upload Windows 11 Native TSF Full Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: QinShu-IME-TSF-Win11-Full
+          path: dist/Qin书/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Qin书输入法 {0}', github.ref_name) || 'Qin书输入法 (Latest Build)' }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            dist/QinShu-IME-TSF-Win11-Full.zip
+            dist/Qin书/Qin书.exe
