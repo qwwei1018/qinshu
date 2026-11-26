@@ -54,8 +54,9 @@ func StartTSFPipeServer(handler PipeServerHandler) chan struct{} {
 }
 
 func buildAppContainerSA() (*securityAttributes, uintptr) {
-	// 允许所有桌面进程 (WD) 与 Win11 UWP/Edge/终端 AppContainer 沙箱进程 (AC) 连接管道
-	sddl, _ := syscall.UTF16PtrFromString("D:(A;;GA;;;WD)(A;;GA;;;AC)")
+	// 允许所有桌面进程 (WD) 与 Win11 UWP/Edge/终端 AppContainer 沙箱进程 (AC) 连接管道，
+	// 并显式设置低完整性标签 (LW)，防止以管理员身份启动时普通权限应用 (Medium/Low) 连接被拒绝 (ERROR_ACCESS_DENIED)。
+	sddl, _ := syscall.UTF16PtrFromString("D:(A;;GA;;;WD)(A;;GA;;;AC)S:(ML;;NW;;;LW)")
 	var sd uintptr
 	ok, _, _ := procConvertStringSDToSDW.Call(
 		uintptr(unsafe.Pointer(sddl)),

@@ -5,6 +5,7 @@ package win32
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -184,6 +185,9 @@ func (a *App) getPopupCaretPos() (int32, int32) {
 
 // RunApp 启动 Qin书 Windows 11 悬浮输入法。tsfMode=true 时运行为原生 TSF COM 的轻量后端服务。
 func RunApp(eng *engine.Engine, baseDir string, tsfMode bool) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	mutex, err := AcquireSingleInstanceMutex()
 	if err != nil {
 		return err
