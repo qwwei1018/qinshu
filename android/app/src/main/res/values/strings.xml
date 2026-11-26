@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Qin书输入法</string>
+    <string name="ime_name">Qin书</string>
+    <string name="subtype_zh">简体中文（拼音）</string>
+    <string name="subtype_en">English</string>
+    <string name="otp_listener_label">Qin书短信验证码识别</string>
+</resources>

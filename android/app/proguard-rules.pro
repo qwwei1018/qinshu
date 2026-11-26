@@ -1,0 +1,4 @@
+-keep class com.qinshu.ime.QinShuImeService { *; }
+-keep class com.qinshu.ime.SettingsActivity { *; }
+-keep class com.qinshu.ime.smart.OtpNotificationListener { *; }
+-dontwarn kotlin.**

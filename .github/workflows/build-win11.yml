@@ -32,14 +32,18 @@ jobs:
               $tag = $headTags[0]
               $publish = "false"
             } else {
+              $changed = @(git diff --name-only HEAD~1 HEAD 2>$null)
+              $hasWinChanges = $changed.Count -eq 0 -or ($changed | Where-Object {
+                $_ -match '^(cmd/qinshu|cmd/qinshu-cli|internal|tsf|assets|data/(pinyin|english|wubi86|phrases)\.txt|go\.mod|.*\.bat$|README\.md$)'
+              }).Count -gt 0
               $cfg = Get-Content -Raw "internal/config/config.go"
               if ($cfg -match 'AppVersion\s*=\s*"([^"]+)"') {
                 $ver = $Matches[1]
               } else {
-                $ver = "2.0.1"
+                $ver = "2.0.3"
               }
               $tag = "v$ver.${{ github.run_number }}"
-              $publish = "true"
+              $publish = if ($hasWinChanges) { "true" } else { "false" }
             }
           }
           "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
