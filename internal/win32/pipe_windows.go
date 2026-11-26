@@ -5,9 +5,11 @@ package win32
 import (
 	"encoding/hex"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -81,17 +83,18 @@ func runPipeAcceptLoop(handler PipeServerHandler, stopCh <-chan struct{}) {
 	if sd != 0 {
 		defer procLocalFree.Call(sd)
 	}
-
-	var saPtr uintptr
-	if sa != nil {
-		saPtr = uintptr(unsafe.Pointer(sa))
-	}
+	defer runtime.KeepAlive(sa)
 
 	for {
 		select {
 		case <-stopCh:
 			return
 		default:
+		}
+
+		var saPtr uintptr
+		if sa != nil {
+			saPtr = uintptr(unsafe.Pointer(sa))
 		}
 
 		hPipe, _, _ := procCreateNamedPipeW.Call(
@@ -105,7 +108,8 @@ func runPipeAcceptLoop(handler PipeServerHandler, stopCh <-chan struct{}) {
 			saPtr,
 		)
 		if hPipe == uintptr(syscall.InvalidHandle) || hPipe == 0 {
-			return
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 
 		connected, _, err := procConnectNamedPipe.Call(hPipe, 0)
