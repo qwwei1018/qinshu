@@ -195,7 +195,7 @@ object SmartRecognizer {
     }
 
     private fun formatCalcNumber(v: Double): String {
-        val rounded = kotlin.math.rint(v)
+        val rounded = kotlin.math.round(v)
         if (abs(v - rounded) < 1e-9 && abs(rounded) < 1e15) {
             return rounded.toLong().toString()
         }
