@@ -94,7 +94,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          gradle testReleaseUnitTest assembleRelease --no-daemon
+          set -o pipefail
+          if ! gradle testReleaseUnitTest assembleRelease --no-daemon --console=plain --stacktrace 2>&1 | tee gradle-build.log; then
+            grep -E '(^e: |FAILURE:|What went wrong:|Execution failed|Exception|Test .* FAILED)' gradle-build.log | head -n 10 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            tail -n 30 gradle-build.log | head -n 8 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          fi
 
       - name: Prepare Release artifact
         run: |
