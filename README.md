@@ -17,7 +17,7 @@
 
 ## 下载与安装（Releases）
 
-1. 前往本仓库 [Releases](https://github.com/qwwei1018/qinshu/releases) 下载最新版本的压缩包（例如 `QinShu-IME-TSF-Win11-Full-v2.0.2.zip`）并解压。
+1. 前往本仓库 [Releases](https://github.com/qwwei1018/qinshu/releases) 下载最新版本的压缩包（例如 `QinShu-IME-TSF-Win11-Full-v2.0.3.zip`）并解压。
 2. 双击运行 **`安装_Qin书TSF.bat`**（自动复制文件至 `C:\Program Files\QinShu`，注册 x64/x86 TSF COM 组件，配置开机自启并启动后台服务）。
 3. 按 **`Win + Space`** 切换到 **「Qin书」** 即可开始输入。
 4. 如需卸载，双击运行 **`卸载_Qin书TSF.bat`**。
@@ -60,6 +60,10 @@
 
 ## 版本记录
 
+- **v2.0.3**
+  - 优化常用字/词智能提前与混输排序：分档动态提权（第 2 页及以上选词 `+2500`、首页非首位 `+1500`、首位巩固 `+600`，含上限防锁死），修复五笔二级简码（如 `fp` → `过`）被未用自定义短语固定压制、简拼/前缀/整句组词/英文补全未按用户词频排序的问题；
+  - 修复状态栏右键「退出 Qin书输入法」或点击 `×` 后窗口残留卡死的问题：退出时立即隐藏并销毁悬浮窗与候选窗、卸载全局键盘钩子并释放资源；
+  - 统一全部 `.bat` 脚本为 Windows `CRLF` 换行（并配置 `.gitattributes`），修复双击 `编译并运行_Qin书.bat` 闪退问题。
 - **v2.0.2**
   - 修复 Win11 TSF 模式下在 Chromium/Electron 等应用中单击 `Shift` 无法切换中英文的问题（TSF 激活/焦点同步 + 只读被动 Shift 观察器兜底）；
   - 全面升级英文模式（`En`）：内置 5,019 词高频英文词库支持智能单词补全（`1-9` / `Tab` / 方向键选词，空格流畅连打），并完整支持智能邮箱（`zxc@`）与智能网址（`http:` / `https:` / `www.`）补全；

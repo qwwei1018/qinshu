@@ -102,3 +102,64 @@ func TestImportFileAndDeduplication(t *testing.T) {
 		t.Fatalf("expected deduplicated single '测词', got %d", matchCount)
 	}
 }
+
+func TestDynamicFrequencySmartPromotionAndPersistence(t *testing.T) {
+	d, tmp := setupTestDict(t)
+
+	// 1. 拼音第 3 页候选（索引 >= 10）在选中 1~2 次后应迅速提前至首页甚至首位
+	initial := d.QueryPinyin("shi", false, nil, false, 40)
+	if len(initial) < 15 {
+		t.Fatalf("expected >= 15 candidates for 'shi', got %d", len(initial))
+	}
+	target := initial[12].Text
+	d.BoostSelection("pinyin", "shi", target, 12, 5)
+	after1 := d.QueryPinyin("shi", false, nil, false, 40)
+	pos1 := -1
+	for i, c := range after1 {
+		if c.Text == target {
+			pos1 = i
+			break
+		}
+	}
+	if pos1 < 0 || pos1 >= 5 {
+		t.Fatalf("expected page-3 char %q to jump to page 1 after 1 selection, got index %d", target, pos1)
+	}
+	d.BoostSelection("pinyin", "shi", target, pos1, 5)
+	after2 := d.QueryPinyin("shi", false, nil, false, 40)
+	if after2[0].Text != target {
+		t.Fatalf("expected %q to reach #1 after 2nd selection, got #1=%q", target, after2[0].Text)
+	}
+
+	// 2. 简拼（如 zg）第 2/3 页词条被选中后也应提前并超越默认高权词
+	jpInit := d.QueryPinyin("zg", false, nil, false, 40)
+	if len(jpInit) < 10 {
+		t.Fatalf("expected >= 10 initials candidates for 'zg', got %d", len(jpInit))
+	}
+	jpTarget := jpInit[8].Text
+	d.BoostSelection("pinyin", "zg", jpTarget, 8, 5)
+	jpAfter := d.QueryPinyin("zg", false, nil, false, 40)
+	if jpAfter[0].Text != jpTarget {
+		t.Fatalf("expected initials candidate %q to reach #1, got #1=%q", jpTarget, jpAfter[0].Text)
+	}
+
+	// 3. 英文补全也支持动态词频提前
+	enInit := d.QueryEnglish("pro", 10)
+	if len(enInit) < 5 {
+		t.Fatalf("expected >= 5 english candidates for 'pro', got %d", len(enInit))
+	}
+	enTarget := enInit[4].Text
+	d.BoostSelection("english", "pro", enTarget, 4, 5)
+	d.BoostSelection("english", "pro", enTarget, 1, 5)
+	enAfter := d.QueryEnglish("pro", 10)
+	if enAfter[0].Text != enTarget {
+		t.Fatalf("expected english candidate %q to reach #1, got #1=%q", enTarget, enAfter[0].Text)
+	}
+
+	// 4. 持久化落盘后重新加载词库仍保持首位
+	d.FlushUserDict()
+	reloaded := New(tmp)
+	recheck := reloaded.QueryPinyin("shi", false, nil, false, 40)
+	if len(recheck) == 0 || recheck[0].Text != target {
+		t.Fatalf("expected persisted #1 %q after reload, got %+v", target, recheck[:3])
+	}
+}

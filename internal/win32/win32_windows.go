@@ -39,6 +39,7 @@ var (
 
 	procRegisterClassExW    = modUser32.NewProc("RegisterClassExW")
 	procCreateWindowExW     = modUser32.NewProc("CreateWindowExW")
+	procDestroyWindow       = modUser32.NewProc("DestroyWindow")
 	procDefWindowProcW      = modUser32.NewProc("DefWindowProcW")
 	procShowWindow          = modUser32.NewProc("ShowWindow")
 	procSetWindowPos        = modUser32.NewProc("SetWindowPos")

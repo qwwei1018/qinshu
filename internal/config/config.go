@@ -10,7 +10,7 @@ import (
 
 const (
 	AppName    = "Qin书"
-	AppVersion = "2.0.2"
+	AppVersion = "2.0.3"
 
 	ModeMixed  = "mixed"  // 五笔拼音混输（参考万能五笔）
 	ModeWubi   = "wubi"   // 纯五笔86

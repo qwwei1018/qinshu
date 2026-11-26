@@ -32,4 +32,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Qin书输入法启动失败: %v\n", err)
 		os.Exit(1)
 	}
+	os.Exit(0)
 }

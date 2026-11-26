@@ -353,3 +353,109 @@ func TestEnglishModeSmartCompletionEmailAndURL(t *testing.T) {
 		t.Fatalf("expected smart email for test@ in Zh mode, got %+v", vs)
 	}
 }
+
+func TestSmartCandidatePromotionAndFPBehavior(t *testing.T) {
+	eng, _ := setupTestEngine(t)
+	eng.SetInputMode(config.ModeMixed)
+
+	// 1. 混输模式下输入 "fp"：高频五笔二级简码 "过" 应排第 1，不再被未打过的短语 "今日复盘..." 压在第 3 位
+	typeSeq(eng, "fp")
+	vs := eng.GetViewState()
+	if len(vs.PageCandidates) == 0 || vs.PageCandidates[0].Text != "过" {
+		t.Fatalf("expected '过' at #1 for 'fp', got %+v", vs.PageCandidates)
+	}
+	act := eng.HandleKey("Space", ' ', false, false, false)
+	if act.CommitText != "过" {
+		t.Fatalf("expected Space to commit '过', got %q", act.CommitText)
+	}
+
+	// 2. 混输模式下拼音高频字/常用词应可反超碰撞的五笔词条（如 you -> 有 选中后反超 亦）
+	eng.Clear()
+	typeSeq(eng, "you")
+	vs = eng.GetViewState()
+	youIdx := -1
+	for i, c := range vs.PageCandidates {
+		if c.Text == "有" {
+			youIdx = i
+			break
+		}
+	}
+	if youIdx < 0 {
+		t.Fatalf("expected '有' on page 1 for 'you', got %+v", vs.PageCandidates)
+	}
+	if youIdx > 0 {
+		if _, ok := eng.SelectCandidate(youIdx); !ok {
+			t.Fatalf("SelectCandidate(%d) failed", youIdx)
+		}
+		typeSeq(eng, "you")
+		vs = eng.GetViewState()
+		if vs.PageCandidates[0].Text != "有" {
+			t.Fatalf("expected '有' to promote to #1 for 'you', got #1=%q", vs.PageCandidates[0].Text)
+		}
+	}
+	eng.Clear()
+
+	// 3. 快捷命令碰撞词（如 fh -> 直 在符号面板后的第 3 页）选中后也应智能提前至首位
+	typeSeq(eng, "fh")
+	vs = eng.GetViewState()
+	if len(vs.PageCandidates) == 0 || vs.PageCandidates[0].Text != "「」" {
+		t.Fatalf("expected '「」' initially #1 for 'fh', got %+v", vs.PageCandidates)
+	}
+	zhiIdx := -1
+	for p := 0; p < vs.TotalPages; p++ {
+		cur := eng.GetViewState()
+		for i, c := range cur.PageCandidates {
+			if c.Text == "直" {
+				zhiIdx = i
+				break
+			}
+		}
+		if zhiIdx >= 0 {
+			break
+		}
+		eng.HandleKey("Page_Down", 0, false, false, false)
+	}
+	if zhiIdx < 0 {
+		t.Fatalf("expected '直' in candidates for 'fh'")
+	}
+	eng.SelectCandidate(zhiIdx)
+	typeSeq(eng, "fh")
+	vs = eng.GetViewState()
+	if vs.PageCandidates[0].Text != "直" {
+		t.Fatalf("expected '直' to overtake '「」' after selection, got %+v", vs.PageCandidates)
+	}
+	eng.Clear()
+
+	// 4. 第 3 页候选字通过翻页选中后应迅速提前至首页并置顶
+	eng.SetInputMode(config.ModePinyin)
+	typeSeq(eng, "shi")
+	eng.HandleKey("Page_Down", 0, false, false, false)
+	eng.HandleKey("Page_Down", 0, false, false, false)
+	vs = eng.GetViewState()
+	if vs.Page != 2 || len(vs.PageCandidates) < 3 {
+		t.Fatalf("expected page 3 candidates for 'shi', got page=%d len=%d", vs.Page, len(vs.PageCandidates))
+	}
+	page3Word := vs.PageCandidates[2].Text
+	if text, ok := eng.SelectCandidate(2); !ok || text != page3Word {
+		t.Fatalf("expected to select %q from page 3, got %q ok=%v", page3Word, text, ok)
+	}
+	// 再次输入 shi，应在首页内即可看到；再选一次应跃升第 1
+	typeSeq(eng, "shi")
+	vs = eng.GetViewState()
+	foundIdx := -1
+	for i, c := range vs.PageCandidates {
+		if c.Text == page3Word {
+			foundIdx = i
+			break
+		}
+	}
+	if foundIdx < 0 {
+		t.Fatalf("expected %q on page 1 after 1 selection from page 3, got %+v", page3Word, vs.PageCandidates)
+	}
+	eng.SelectCandidate(foundIdx)
+	typeSeq(eng, "shi")
+	vs = eng.GetViewState()
+	if vs.PageCandidates[0].Text != page3Word {
+		t.Fatalf("expected %q to reach #1 after 2nd selection, got #1=%q", page3Word, vs.PageCandidates[0].Text)
+	}
+}

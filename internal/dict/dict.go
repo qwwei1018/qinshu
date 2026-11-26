@@ -112,6 +112,8 @@ func NewWithUserDir(systemDataDir, userDataDir string) *Dictionary {
 			"wubi":    make(map[string]map[string]int),
 			"pinyin":  make(map[string]map[string]int),
 			"english": make(map[string]map[string]int),
+			"phrase":  make(map[string]map[string]int),
+			"command": make(map[string]map[string]int),
 		},
 	}
 	d.Reload()
@@ -310,20 +312,29 @@ func (d *Dictionary) QueryPhrases(code string) []Candidate {
 	}
 	d.mu.RLock()
 	templates := d.phraseMap[key]
-	d.mu.RUnlock()
-	if len(templates) == 0 {
-		return nil
-	}
+	userBucket := d.userFreq["phrase"][key]
 	out := make([]Candidate, 0, len(templates))
 	for i, tpl := range templates {
+		expanded := expandPhraseVars(tpl)
+		bonus := userBucket[tpl]
+		if b := userBucket[expanded]; b > bonus {
+			bonus = b
+		}
 		out = append(out, Candidate{
-			Text:   expandPhraseVars(tpl),
+			Text:   expanded,
 			Code:   key,
 			Source: "phrase",
-			Score:  float64(3500 - i*10),
+			Score:  float64(3500-i*10) + float64(bonus),
 			Hint:   "短语",
 		})
 	}
+	d.mu.RUnlock()
+	if len(out) == 0 {
+		return nil
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Score > out[j].Score
+	})
 	return out
 }
 
@@ -528,7 +539,7 @@ func (d *Dictionary) loadUserDict() {
 	if err := json.Unmarshal(raw, &parsed); err != nil {
 		return
 	}
-	for _, sec := range []string{"wubi", "pinyin", "english"} {
+	for _, sec := range []string{"wubi", "pinyin", "english", "phrase", "command"} {
 		if parsed[sec] != nil {
 			d.userFreq[sec] = parsed[sec]
 		}
@@ -573,20 +584,66 @@ func (d *Dictionary) FlushUserDict() {
 	}
 }
 
+const (
+	defaultBoostDelta = 1200
+	maxUserFreqBonus  = 15000
+)
+
 // BoostWord 动态提升选词权重（异步防抖落盘，不阻塞键盘钩子）。
 func (d *Dictionary) BoostWord(source, code, word string) {
+	d.BoostWordBy(source, code, word, defaultBoostDelta)
+}
+
+// BoostSelection 根据候选所在位置智能提升词频权重：
+// 首页首位轻微巩固 (+600)，首页非首位快速提前 (+1500)，第 2 页及以上强力提前 (+2500)。
+func (d *Dictionary) BoostSelection(source, code, word string, absIndex, pageSize int) {
+	if pageSize <= 0 {
+		pageSize = 5
+	}
+	delta := 600
+	if absIndex >= pageSize {
+		delta = 2500
+	} else if absIndex > 0 {
+		delta = 1500
+	}
+	d.BoostWordBy(source, code, word, delta)
+}
+
+// BoostWordBy 按指定增量提升词频权重（带上限防止旧词锁定无法反超），并异步防抖落盘。
+func (d *Dictionary) BoostWordBy(source, code, word string, delta int) {
+	if delta <= 0 {
+		delta = defaultBoostDelta
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	sec, ok := d.userFreq[source]
 	if !ok {
 		return
 	}
-	ck := strings.ToLower(code)
+	ck := strings.ToLower(strings.TrimSpace(code))
+	if ck == "" || word == "" {
+		return
+	}
 	if sec[ck] == nil {
 		sec[ck] = make(map[string]int)
 	}
-	sec[ck][word] += 150
+	next := sec[ck][word] + delta
+	if next > maxUserFreqBonus {
+		next = maxUserFreqBonus
+	}
+	sec[ck][word] = next
 	d.scheduleSaveUserDictLocked()
+}
+
+// GetUserBonus 返回指定词条当前累计的用户词频加分。
+func (d *Dictionary) GetUserBonus(source, code, word string) int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	sec := d.userFreq[source]
+	if sec == nil {
+		return 0
+	}
+	return sec[strings.ToLower(strings.TrimSpace(code))][word]
 }
 
 // AddUserWord 用户手动造词或整句自动学习，立即生效并异步落盘。
@@ -603,7 +660,19 @@ func (d *Dictionary) AddUserWord(source, code, word string, weight int) {
 	defer d.mu.Unlock()
 	switch source {
 	case "wubi":
-		d.wubiMap[codeLow] = append([]wordEntry{{word: word, weight: weight}}, d.wubiMap[codeLow]...)
+		exists := false
+		for i, e := range d.wubiMap[codeLow] {
+			if e.word == word {
+				if weight > e.weight {
+					d.wubiMap[codeLow][i].weight = weight
+				}
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			d.wubiMap[codeLow] = append([]wordEntry{{word: word, weight: weight}}, d.wubiMap[codeLow]...)
+		}
 		d.wordToWubi[word] = codeLow
 		idx := sort.SearchStrings(d.wubiKeys, codeLow)
 		if idx >= len(d.wubiKeys) || d.wubiKeys[idx] != codeLow {
@@ -613,7 +682,19 @@ func (d *Dictionary) AddUserWord(source, code, word string, weight int) {
 		}
 	case "pinyin":
 		fullKey := strings.ReplaceAll(strings.ReplaceAll(codeLow, " ", ""), "'", "")
-		d.pinyinMap[fullKey] = append([]pinyinEntry{{word: word, weight: weight, syllables: codeLow}}, d.pinyinMap[fullKey]...)
+		exists := false
+		for i, e := range d.pinyinMap[fullKey] {
+			if e.word == word {
+				if weight > e.weight {
+					d.pinyinMap[fullKey][i].weight = weight
+				}
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			d.pinyinMap[fullKey] = append([]pinyinEntry{{word: word, weight: weight, syllables: codeLow}}, d.pinyinMap[fullKey]...)
+		}
 		idx := sort.SearchStrings(d.pinyinKeys, fullKey)
 		if idx >= len(d.pinyinKeys) || d.pinyinKeys[idx] != fullKey {
 			d.pinyinKeys = append(d.pinyinKeys, "")
@@ -626,7 +707,11 @@ func (d *Dictionary) AddUserWord(source, code, word string, weight int) {
 		if sec[codeLow] == nil {
 			sec[codeLow] = make(map[string]int)
 		}
-		sec[codeLow][word] += 150
+		next := sec[codeLow][word] + defaultBoostDelta
+		if next > maxUserFreqBonus {
+			next = maxUserFreqBonus
+		}
+		sec[codeLow][word] = next
 		d.scheduleSaveUserDictLocked()
 	}
 }
@@ -738,11 +823,15 @@ func (d *Dictionary) QueryWubi(code string, showHint bool, limit int) []Candidat
 				}
 				for _, e := range entries[:maxAdd] {
 					if _, ok := res[e.word]; !ok {
+						bonus := d.userFreq["wubi"][k][e.word]
+						if k != code {
+							bonus += userBucket[e.word]
+						}
 						res[e.word] = Candidate{
 							Text:   e.word,
 							Code:   k,
 							Source: "wubi",
-							Score:  float64(e.weight) * 0.35,
+							Score:  float64(e.weight)*0.35 + float64(bonus),
 							Hint:   "~" + k[len(code):],
 						}
 					}
@@ -771,11 +860,12 @@ func (d *Dictionary) QueryWubi(code string, showHint bool, limit int) []Candidat
 			}
 			for _, e := range entries[:maxAdd] {
 				if _, ok := res[e.word]; !ok {
+					bonus := d.userFreq["wubi"][k][e.word]
 					res[e.word] = Candidate{
 						Text:   e.word,
 						Code:   k,
 						Source: "wubi",
-						Score:  float64(e.weight) * 0.8,
+						Score:  float64(e.weight)*0.8 + float64(bonus),
 						Hint:   "五:" + k,
 					}
 				}
@@ -836,7 +926,18 @@ func (d *Dictionary) composeSentenceLocked(syls []string, fuzzyEnabled bool, fuz
 					continue
 				}
 				top := entries[0]
-				userBonus := d.userFreq["pinyin"][sv.FullKey][top.word]
+				userBucket := d.userFreq["pinyin"][sv.FullKey]
+				userBonus := userBucket[top.word]
+				if len(userBucket) > 0 {
+					bestEntryScore := top.weight + userBonus
+					for _, e := range entries {
+						if b := userBucket[e.word]; b > 0 && e.weight+b > bestEntryScore {
+							bestEntryScore = e.weight + b
+							top = e
+							userBonus = b
+						}
+					}
+				}
 				spanBonus := 0.0
 				if span == 2 {
 					spanBonus = 3200.0
@@ -933,6 +1034,17 @@ func (d *Dictionary) QueryPinyin(rawCode string, fuzzyEnabled bool, fuzzyRules m
 	}
 
 	cleanKey := strings.ReplaceAll(code, "'", "")
+	for word, bonus := range d.userFreq["pinyin"][cleanKey] {
+		score := 1200.0 + float64(bonus)
+		if prev, ok := res[word]; !ok || score > prev.Score {
+			hint := ""
+			if showHint {
+				hint = d.getWubiHintLocked(word)
+			}
+			res[word] = Candidate{Text: word, Code: cleanKey, Source: "pinyin", Score: score, Hint: hint}
+		}
+	}
+
 	if len(paths) > 0 && len(paths[0]) >= 2 {
 		if sentence, dpScore, ok := d.composeSentenceLocked(paths[0], fuzzyEnabled, fuzzyRules); ok {
 			if _, exists := res[sentence]; !exists {
@@ -975,11 +1087,17 @@ func (d *Dictionary) QueryPinyin(rawCode string, fuzzyEnabled bool, fuzzyRules m
 		for jpKey, jpW := range jpMap {
 			entries := d.pinyinInitialsMap[jpKey]
 			maxAdd := len(entries)
-			if maxAdd > 15 {
-				maxAdd = 15
+			if maxAdd > 30 {
+				maxAdd = 30
 			}
+			jpBucket := d.userFreq["pinyin"][jpKey]
 			for _, e := range entries[:maxAdd] {
-				score := float64(e.weight) * 0.55 * jpW
+				bonus := jpBucket[e.word]
+				fullKey := strings.ReplaceAll(e.syllables, "'", "")
+				if fullKey != "" && fullKey != jpKey {
+					bonus += d.userFreq["pinyin"][fullKey][e.word]
+				}
+				score := float64(e.weight)*0.55*jpW + float64(bonus)*jpW
 				if prev, ok := res[e.word]; !ok || score > prev.Score {
 					hint := ""
 					if showHint {
@@ -1006,8 +1124,9 @@ func (d *Dictionary) QueryPinyin(rawCode string, fuzzyEnabled bool, fuzzyRules m
 			if maxAdd > 3 {
 				maxAdd = 3
 			}
+			kBucket := d.userFreq["pinyin"][k]
 			for _, e := range entries[:maxAdd] {
-				score := float64(e.weight) * 0.32
+				score := float64(e.weight)*0.32 + float64(kBucket[e.word])
 				if prev, ok := res[e.word]; !ok || score > prev.Score {
 					hint := ""
 					if showHint {
@@ -1057,6 +1176,7 @@ func (d *Dictionary) QueryEnglish(prefix string, limit int) []Candidate {
 	seen := make(map[string]bool)
 	allUpper := len(prefix) > 1 && strings.ToUpper(prefix) == prefix
 	firstUpper := unicode.IsUpper(rune(prefix[0]))
+	userBucket := d.userFreq["english"][low]
 
 	for _, e := range d.englishPrefixMap[bucketKey] {
 		if strings.HasPrefix(strings.ToLower(e.word), low) && !seen[e.word] {
@@ -1067,15 +1187,28 @@ func (d *Dictionary) QueryEnglish(prefix string, limit int) []Candidate {
 			} else if firstUpper && len(e.word) > 0 {
 				display = strings.ToUpper(e.word[:1]) + e.word[1:]
 			}
-			score := float64(e.weight)
+			bonus := userBucket[e.word]
+			if b := userBucket[display]; b > bonus {
+				bonus = b
+			}
+			score := float64(e.weight + bonus)
 			if strings.ToLower(e.word) == low {
 				score += 500.0
 			}
 			out = append(out, Candidate{Text: display, Code: low, Source: "english", Score: score, Hint: "En"})
-			if len(out) >= limit {
-				break
-			}
 		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		if len(out[i].Text) != len(out[j].Text) {
+			return len(out[i].Text) < len(out[j].Text)
+		}
+		return out[i].Text < out[j].Text
+	})
+	if len(out) > limit {
+		out = out[:limit]
 	}
 	return out
 }

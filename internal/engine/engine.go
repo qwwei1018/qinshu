@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -290,8 +291,8 @@ func (e *Engine) selectCandidateLocked(indexInPage int) (string, bool) {
 	cand := e.candidates[absIdx]
 	if cand.Composed && e.Config.AutoLearnPhrases {
 		e.Dict.AddUserWord("pinyin", cand.Code, cand.Text, 2200)
-	} else if e.Config.DynamicFrequency && (cand.Source == "wubi" || cand.Source == "pinyin" || cand.Source == "english") {
-		e.Dict.BoostWord(cand.Source, cand.Code, cand.Text)
+	} else if e.Config.DynamicFrequency && (cand.Source == "wubi" || cand.Source == "pinyin" || cand.Source == "english" || cand.Source == "phrase" || cand.Source == "command") {
+		e.Dict.BoostSelection(cand.Source, cand.Code, cand.Text, absIdx, e.Config.PageSize)
 	}
 	text := cand.Text
 	runes := []rune(text)
@@ -308,22 +309,22 @@ func queryQuickCommands(code string) []dict.Candidate {
 	switch low {
 	case "rq", "date":
 		return []dict.Candidate{
-			{Text: now.Format("2006年01月02日"), Code: low, Source: "command", Score: 3000, Hint: "日期"},
-			{Text: now.Format("2006-01-02"), Code: low, Source: "command", Score: 2900, Hint: "日期"},
-			{Text: now.Format("2006/01/02"), Code: low, Source: "command", Score: 2800, Hint: "日期"},
+			{Text: now.Format("2006年01月02日"), Code: low, Source: "command", Score: 4200, Hint: "日期"},
+			{Text: now.Format("2006-01-02"), Code: low, Source: "command", Score: 4190, Hint: "日期"},
+			{Text: now.Format("2006/01/02"), Code: low, Source: "command", Score: 4180, Hint: "日期"},
 		}
 	case "sj", "time":
 		return []dict.Candidate{
-			{Text: now.Format("15:04:05"), Code: low, Source: "command", Score: 3000, Hint: "时间"},
-			{Text: now.Format("15:04"), Code: low, Source: "command", Score: 2900, Hint: "时间"},
-			{Text: now.Format("2006-01-02 15:04:05"), Code: low, Source: "command", Score: 2800, Hint: "时间"},
+			{Text: now.Format("15:04:05"), Code: low, Source: "command", Score: 4200, Hint: "时间"},
+			{Text: now.Format("15:04"), Code: low, Source: "command", Score: 4190, Hint: "时间"},
+			{Text: now.Format("2006-01-02 15:04:05"), Code: low, Source: "command", Score: 4180, Hint: "时间"},
 		}
 	case "xq", "week":
 		wd := zhWeekdays[int(now.Weekday())]
 		return []dict.Candidate{
-			{Text: "星期" + wd, Code: low, Source: "command", Score: 3000, Hint: "星期"},
-			{Text: "周" + wd, Code: low, Source: "command", Score: 2900, Hint: "星期"},
-			{Text: now.Weekday().String(), Code: low, Source: "command", Score: 2800, Hint: "星期"},
+			{Text: "星期" + wd, Code: low, Source: "command", Score: 4200, Hint: "星期"},
+			{Text: "周" + wd, Code: low, Source: "command", Score: 4190, Hint: "星期"},
+			{Text: now.Weekday().String(), Code: low, Source: "command", Score: 4180, Hint: "星期"},
 		}
 	case "fh":
 		out := make([]dict.Candidate, 0, len(quickSymbols))
@@ -332,32 +333,32 @@ func queryQuickCommands(code string) []dict.Candidate {
 				Text:   sym,
 				Code:   low,
 				Source: "command",
-				Score:  float64(3000 - i*10),
+				Score:  float64(4200 - i*10),
 				Hint:   "符号",
 			})
 		}
 		return out
 	case "http":
 		return []dict.Candidate{
-			{Text: "http://", Code: low, Source: "command", Score: 3600, Hint: "网址"},
-			{Text: "https://", Code: low, Source: "command", Score: 3550, Hint: "网址"},
-			{Text: "http://www.", Code: low, Source: "command", Score: 3500, Hint: "网址"},
-			{Text: "https://www.", Code: low, Source: "command", Score: 3450, Hint: "网址"},
+			{Text: "http://", Code: low, Source: "command", Score: 4400, Hint: "网址"},
+			{Text: "https://", Code: low, Source: "command", Score: 4390, Hint: "网址"},
+			{Text: "http://www.", Code: low, Source: "command", Score: 4380, Hint: "网址"},
+			{Text: "https://www.", Code: low, Source: "command", Score: 4370, Hint: "网址"},
 		}
 	case "https":
 		return []dict.Candidate{
-			{Text: "https://", Code: low, Source: "command", Score: 3600, Hint: "网址"},
-			{Text: "https://www.", Code: low, Source: "command", Score: 3550, Hint: "网址"},
+			{Text: "https://", Code: low, Source: "command", Score: 4400, Hint: "网址"},
+			{Text: "https://www.", Code: low, Source: "command", Score: 4390, Hint: "网址"},
 		}
 	case "ftp":
 		return []dict.Candidate{
-			{Text: "ftp://", Code: low, Source: "command", Score: 3600, Hint: "网址"},
+			{Text: "ftp://", Code: low, Source: "command", Score: 4400, Hint: "网址"},
 		}
 	case "www":
 		return []dict.Candidate{
-			{Text: "www.", Code: low, Source: "command", Score: 3600, Hint: "网址"},
-			{Text: "https://www.", Code: low, Source: "command", Score: 3550, Hint: "网址"},
-			{Text: "http://www.", Code: low, Source: "command", Score: 3500, Hint: "网址"},
+			{Text: "www.", Code: low, Source: "command", Score: 4400, Hint: "网址"},
+			{Text: "https://www.", Code: low, Source: "command", Score: 4390, Hint: "网址"},
+			{Text: "http://www.", Code: low, Source: "command", Score: 4380, Hint: "网址"},
 		}
 	}
 	return nil
@@ -519,22 +520,44 @@ func (e *Engine) refreshCandidatesLocked() {
 	code := e.buffer
 	mode := e.Config.InputMode
 	showHint := e.Config.ShowReverseHint
-	var combined []dict.Candidate
-	seen := make(map[string]bool)
+	resMap := make(map[string]dict.Candidate)
+	order := make([]string, 0, 48)
 
 	addUnique := func(list []dict.Candidate) {
 		for _, c := range list {
-			if !seen[c.Text] {
-				seen[c.Text] = true
-				combined = append(combined, c)
+			if prev, ok := resMap[c.Text]; !ok {
+				resMap[c.Text] = c
+				order = append(order, c.Text)
+			} else if c.Score > prev.Score {
+				resMap[c.Text] = c
 			}
 		}
 	}
 
-	// 1. 用户自定义短语（最高优先级，支持动态日期时间变量）
+	// 1. 用户自定义短语（参与动态词频竞争，常用单字/词组可反超置顶）
 	addUnique(e.Dict.QueryPhrases(code))
 	// 2. 内置快捷命令 (rq / sj / xq / fh / http / https / www / ftp)
-	addUnique(queryQuickCommands(code))
+	cmdCands := queryQuickCommands(code)
+	for i := range cmdCands {
+		cmdCands[i].Score += float64(e.Dict.GetUserBonus("command", cmdCands[i].Code, cmdCands[i].Text))
+	}
+	addUnique(cmdCands)
+
+	addEnglishInZh := func() {
+		if len(code) < 3 {
+			return
+		}
+		enCands := e.Dict.QueryEnglish(code, 3)
+		for i := range enCands {
+			bonus := float64(e.Dict.GetUserBonus("english", enCands[i].Code, enCands[i].Text))
+			base := enCands[i].Score - bonus
+			if base < 0 {
+				base = 0
+			}
+			enCands[i].Score = base*0.2 + bonus
+		}
+		addUnique(enCands)
+	}
 
 	switch mode {
 	case config.ModeWubi:
@@ -542,40 +565,23 @@ func (e *Engine) refreshCandidatesLocked() {
 
 	case config.ModePinyin:
 		addUnique(e.Dict.QueryPinyin(code, e.Config.FuzzyEnabled, e.Config.FuzzyRules, showHint, 40))
-		if len(code) >= 3 {
-			addUnique(e.Dict.QueryEnglish(code, 3))
-		}
+		addEnglishInZh()
 
 	default:
-		var wubiCands []dict.Candidate
 		if len(code) <= 4 && !strings.Contains(code, "'") {
-			wubiCands = e.Dict.QueryWubi(code, showHint, 15)
+			addUnique(e.Dict.QueryWubi(code, showHint, 25))
 		}
-		pinyinCands := e.Dict.QueryPinyin(code, e.Config.FuzzyEnabled, e.Config.FuzzyRules, showHint, 30)
-
-		var exactWubi, prefixWubi []dict.Candidate
-		for _, c := range wubiCands {
-			if strings.HasPrefix(c.Hint, "~") {
-				prefixWubi = append(prefixWubi, c)
-			} else {
-				exactWubi = append(exactWubi, c)
-			}
-		}
-		topWubi := exactWubi
-		var restWubi []dict.Candidate
-		if len(exactWubi) > 3 {
-			topWubi = exactWubi[:3]
-			restWubi = exactWubi[3:]
-		}
-		addUnique(topWubi)
-		addUnique(pinyinCands)
-		addUnique(restWubi)
-		addUnique(prefixWubi)
-		if len(code) >= 3 {
-			addUnique(e.Dict.QueryEnglish(code, 3))
-		}
+		addUnique(e.Dict.QueryPinyin(code, e.Config.FuzzyEnabled, e.Config.FuzzyRules, showHint, 35))
+		addEnglishInZh()
 	}
 
+	combined := make([]dict.Candidate, 0, len(order))
+	for _, text := range order {
+		combined = append(combined, resMap[text])
+	}
+	sort.SliceStable(combined, func(i, j int) bool {
+		return combined[i].Score > combined[j].Score
+	})
 	e.candidates = combined
 }
 

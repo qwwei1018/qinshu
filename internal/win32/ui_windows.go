@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -22,14 +23,16 @@ const (
 	WS_EX_TOOLWINDOW = 0x00000080
 	WS_EX_NOACTIVATE = 0x08000000
 
-	WM_DESTROY       = 0x0002
-	WM_PAINT         = 0x000F
-	WM_ERASEBKGND    = 0x0014
-	WM_MOUSEACTIVATE = 0x0021
-	WM_MOUSEMOVE     = 0x0200
-	WM_LBUTTONDOWN   = 0x0201
-	WM_LBUTTONUP     = 0x0202
-	WM_RBUTTONUP     = 0x0205
+	WM_DESTROY        = 0x0002
+	WM_PAINT          = 0x000F
+	WM_CLOSE          = 0x0010
+	WM_ERASEBKGND     = 0x0014
+	WM_MOUSEACTIVATE  = 0x0021
+	WM_MOUSEMOVE      = 0x0200
+	WM_LBUTTONDOWN    = 0x0201
+	WM_LBUTTONUP      = 0x0202
+	WM_RBUTTONUP      = 0x0205
+	WM_CAPTURECHANGED = 0x0215
 	WM_USER          = 0x0400
 	wmRefreshUI      = WM_USER + 101
 	wmShiftTap       = WM_USER + 102
@@ -158,6 +161,10 @@ type App struct {
 	shiftMu      sync.Mutex
 	tsfActive    bool
 	lastShiftTap time.Time
+
+	menuOpen atomic.Bool
+	exiting  atomic.Bool
+	exitOnce sync.Once
 }
 
 var activeApp *App
@@ -337,11 +344,40 @@ func RunApp(eng *engine.Engine, baseDir string, tsfMode bool) error {
 		_, _, _ = procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
 		_, _, _ = procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 	}
+	app.requestExit()
 	app.eng.Flush()
+	activeApp = nil
 	return nil
 }
 
+func (a *App) requestExit() {
+	a.exitOnce.Do(func() {
+		a.exiting.Store(true)
+		if a.candHwnd != 0 {
+			_, _, _ = procShowWindow.Call(a.candHwnd, SW_HIDE)
+		}
+		if a.statusHwnd != 0 {
+			_, _, _ = procShowWindow.Call(a.statusHwnd, SW_HIDE)
+		}
+		if a.hook != nil {
+			a.hook.Uninstall()
+		}
+		if a.candHwnd != 0 {
+			_, _, _ = procDestroyWindow.Call(a.candHwnd)
+			a.candHwnd = 0
+		}
+		if a.statusHwnd != 0 {
+			_, _, _ = procDestroyWindow.Call(a.statusHwnd)
+			a.statusHwnd = 0
+		}
+		_, _, _ = procPostQuitMessage.Call(0)
+	})
+}
+
 func (a *App) postRefresh() {
+	if a.exiting.Load() {
+		return
+	}
 	if a.statusHwnd != 0 {
 		_, _, _ = procPostMessageW.Call(a.statusHwnd, wmRefreshUI, 0, 0)
 	}
@@ -745,6 +781,11 @@ func checkedFlag(on bool) uint32 {
 }
 
 func (a *App) showContextMenu(hwnd uintptr) {
+	if a.exiting.Load() || !a.menuOpen.CompareAndSwap(false, true) {
+		return
+	}
+	defer a.menuOpen.Store(false)
+
 	menu, _, _ := procCreatePopupMenu.Call()
 	if menu == 0 {
 		return
@@ -789,6 +830,7 @@ func (a *App) showContextMenu(hwnd uintptr) {
 		uintptr(pt.X), uintptr(pt.Y),
 		0, hwnd, 0,
 	)
+	_, _, _ = procPostMessageW.Call(hwnd, 0, 0, 0)
 	a.handleMenuCommand(int(cmd))
 }
 
@@ -856,7 +898,7 @@ func (a *App) handleMenuCommand(cmd int) {
 	case cmd == cmdReloadDict:
 		a.eng.Dict.Reload()
 	case cmd == cmdExitApp:
-		_, _, _ = procPostQuitMessage.Call(0)
+		a.requestExit()
 		return
 	}
 	a.refreshAllWindows()
@@ -882,15 +924,25 @@ func statusWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 	case WM_ERASEBKGND:
 		return 1
 	case wmRefreshUI:
-		a.refreshAllWindows()
+		if !a.exiting.Load() {
+			a.refreshAllWindows()
+		}
 		return 0
 	case wmShiftTap:
-		a.handleShiftTap(true)
+		if !a.exiting.Load() {
+			a.handleShiftTap(true)
+		}
 		return 0
 	case WM_PAINT:
+		if a.exiting.Load() {
+			return 0
+		}
 		a.paintStatusBar(hwnd)
 		return 0
 	case WM_LBUTTONDOWN:
+		if a.exiting.Load() {
+			return 0
+		}
 		x := lowWord(lParam)
 		y := highWord(lParam)
 		switch {
@@ -914,7 +966,7 @@ func statusWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			a.eng.ToggleFuzzy()
 			a.refreshAllWindows()
 		default:
-			_, _, _ = procPostQuitMessage.Call(0)
+			a.requestExit()
 		}
 		return 0
 	case WM_MOUSEMOVE:
@@ -936,8 +988,16 @@ func statusWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			config.SaveAsync(a.eng.Config, a.baseDir)
 		}
 		return 0
+	case WM_CAPTURECHANGED:
+		a.dragging = false
+		return 0
 	case WM_RBUTTONUP:
-		a.showContextMenu(hwnd)
+		if !a.exiting.Load() {
+			a.showContextMenu(hwnd)
+		}
+		return 0
+	case WM_CLOSE:
+		a.requestExit()
 		return 0
 	case WM_DESTROY:
 		_, _, _ = procPostQuitMessage.Call(0)
