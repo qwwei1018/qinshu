@@ -837,7 +837,14 @@ func (d *Dictionary) composeSentenceLocked(syls []string, fuzzyEnabled bool, fuz
 				}
 				top := entries[0]
 				userBonus := d.userFreq["pinyin"][sv.FullKey][top.word]
-				spanBonus := float64(span*span) * 600.0
+				spanBonus := 0.0
+				if span == 2 {
+					spanBonus = 3200.0
+				} else if span == 3 {
+					spanBonus = 6500.0
+				} else if span >= 4 {
+					spanBonus = 10000.0
+				}
 				sc := (float64(top.weight+userBonus) + spanBonus) * sv.Weight
 				if sc > bestW {
 					bestW = sc
@@ -929,7 +936,7 @@ func (d *Dictionary) QueryPinyin(rawCode string, fuzzyEnabled bool, fuzzyRules m
 	if len(paths) > 0 && len(paths[0]) >= 2 {
 		if sentence, dpScore, ok := d.composeSentenceLocked(paths[0], fuzzyEnabled, fuzzyRules); ok {
 			if _, exists := res[sentence]; !exists {
-				normScore := 2600.0 + dpScore*0.05
+				normScore := 1800.0 + dpScore*0.05
 				res[sentence] = Candidate{
 					Text:     sentence,
 					Code:     cleanKey,

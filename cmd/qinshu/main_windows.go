@@ -19,9 +19,9 @@ func main() {
 	tsfMode := flag.Bool("tsf", false, "以 Win11 原生 TSF COM 后端轻量服务模式运行（通过命名管道服务 QinShuTSF.dll）")
 	flag.Parse()
 
-	// 低资源占用优化：收紧 GC 触发比例并设置 64MB 内存软上限，常驻内存约 8~15MB
-	debug.SetGCPercent(40)
-	debug.SetMemoryLimit(64 << 20)
+	// 低资源占用优化：适配十万级内置五笔86与拼音大词库，避免在 64MB 边界频繁触发 GC
+	debug.SetGCPercent(60)
+	debug.SetMemoryLimit(160 << 20)
 
 	baseDir := config.BaseDir()
 	cfg := config.Load(baseDir)

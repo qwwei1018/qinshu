@@ -59,24 +59,43 @@ func TestWubiStandard86AndAutoCommit4thCode(t *testing.T) {
 		t.Fatalf("expected commit '中', got %q", act.CommitText)
 	}
 
-	standardCases := map[string]string{
-		"dwnn": "秦书",
+	// 标准 86 四码唯一自动上屏用例
+	autoCommitCases := map[string]string{
 		"dcgt": "万能五笔",
 		"aawt": "工作",
-		"wqvb": "你好",
-		"khyy": "中文",
-		"amyy": "英文",
 		"ruuj": "拼音",
 		"ltif": "输入法",
 		"souj": "模糊音",
 		"emsf": "股票",
 		"uqjq": "交易",
 		"watc": "人工智能",
+		"tvey": "很",
+		"stkg": "格",
+		"skny": "可以",
 	}
-	for code, want := range standardCases {
+	for code, want := range autoCommitCases {
 		eng.Clear()
 		if out := typeSeq(eng, code); out != want {
-			t.Errorf("standard wubi86 %q: want %q, got %q", code, want, out)
+			t.Errorf("standard wubi86 auto-commit %q: want %q, got %q", code, want, out)
+		}
+	}
+
+	// 标准 86 存在正常重码或简码的词条：空格确认首选
+	spaceCommitCases := map[string]string{
+		"dwnn": "秦书",
+		"wqvb": "你好",
+		"khyy": "中文",
+		"amyy": "英文",
+		"wjjg": "但是",
+		"tve":  "很",
+		"sk":   "可",
+	}
+	for code, want := range spaceCommitCases {
+		eng.Clear()
+		typeSeq(eng, code)
+		act := eng.HandleKey("Space", ' ', false, false, false)
+		if act.CommitText != want {
+			t.Errorf("standard wubi86 space-commit %q: want %q, got %q", code, want, act.CommitText)
 		}
 	}
 }
