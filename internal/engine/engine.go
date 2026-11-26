@@ -489,18 +489,30 @@ func (e *Engine) refreshCandidatesLocked() {
 		return
 	}
 
-	if e.tempEnglish {
-		enCands := e.Dict.QueryEnglish(e.buffer, 10)
-		if len(enCands) == 0 || enCands[0].Text != e.buffer {
-			enCands = append([]dict.Candidate{{
-				Text:   e.buffer,
-				Code:   strings.ToLower(e.buffer),
-				Source: "english",
-				Score:  9999,
-				Hint:   "英文",
-			}}, enCands...)
+	if e.tempEnglish || e.Config.Language == config.LangEn {
+		var combined []dict.Candidate
+		seen := make(map[string]bool)
+		addUnique := func(list []dict.Candidate) {
+			for _, c := range list {
+				if !seen[c.Text] {
+					seen[c.Text] = true
+					combined = append(combined, c)
+				}
+			}
 		}
-		e.candidates = enCands
+		addUnique([]dict.Candidate{{
+			Text:   e.buffer,
+			Code:   strings.ToLower(e.buffer),
+			Source: "english",
+			Score:  9999,
+			Hint:   "英文",
+		}})
+		if e.Config.Language == config.LangEn {
+			addUnique(e.Dict.QueryPhrases(e.buffer))
+			addUnique(queryQuickCommands(e.buffer))
+		}
+		addUnique(e.Dict.QueryEnglish(e.buffer, 15))
+		e.candidates = combined
 		return
 	}
 
@@ -661,12 +673,9 @@ func (e *Engine) HandleKey(keyName string, ch rune, ctrl, alt, shift bool) Actio
 		return Action{Handled: false}
 	}
 
-	// 2. 英文模式直接放行
+	// 2. 英文模式（支持智能英文单词补全、智能邮箱与智能网址，空缓冲时标点/数字直通半角）
 	if e.Config.Language == config.LangEn {
-		if ch != 0 {
-			e.lastCommittedRune = ch
-		}
-		return Action{Handled: false}
+		return e.handleEnglishModeKeyLocked(keyName, ch)
 	}
 
 	// 3. 候选框激活时的控制键与智能网址/邮箱识别
@@ -707,6 +716,17 @@ func (e *Engine) HandleKey(keyName string, ch rune, ctrl, alt, shift bool) Actio
 				e.clearLocked()
 			}
 			return Action{Handled: true, CommitText: text, UpdateUI: true}
+
+		case "Tab":
+			if e.tempEnglish && len(e.candidates) > 0 {
+				idx := e.selectedIndex
+				if idx == 0 && len(e.candidates) > 1 {
+					idx = 1
+				}
+				if text, ok := e.selectCandidateLocked(idx); ok {
+					return Action{Handled: true, CommitText: text, UpdateUI: true}
+				}
+			}
 
 		case "Down", "Right":
 			ps := e.Config.PageSize
@@ -931,5 +951,192 @@ func (e *Engine) HandleKey(keyName string, ch rune, ctrl, alt, shift bool) Actio
 	if ch != 0 && e.buffer == "" {
 		e.lastCommittedRune = ch
 	}
+	return Action{Handled: false}
+}
+
+func (e *Engine) handleEnglishModeKeyLocked(keyName string, ch rune) Action {
+	if e.buffer == "" {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			e.buffer = string(ch)
+			e.refreshCandidatesLocked()
+			return Action{Handled: true, UpdateUI: true}
+		}
+		if ch != 0 {
+			e.lastCommittedRune = ch
+		}
+		return Action{Handled: false}
+	}
+
+	switch keyName {
+	case "BackSpace":
+		e.buffer = e.buffer[:len(e.buffer)-1]
+		if e.buffer == "" {
+			e.clearLocked()
+		} else {
+			if e.smartMode == "email" && !strings.Contains(e.buffer, "@") {
+				e.smartMode = ""
+			}
+			if e.smartMode == "url" && !strings.Contains(e.buffer, "://") && !strings.HasPrefix(strings.ToLower(e.buffer), "www.") {
+				e.smartMode = ""
+			}
+			e.refreshCandidatesLocked()
+		}
+		return Action{Handled: true, UpdateUI: true}
+
+	case "Escape", "Delete":
+		e.clearLocked()
+		return Action{Handled: true, UpdateUI: true}
+
+	case "Return":
+		raw := e.buffer
+		if len(raw) > 0 {
+			e.lastCommittedRune = rune(raw[len(raw)-1])
+		}
+		e.clearLocked()
+		return Action{Handled: true, CommitText: raw, UpdateUI: true}
+
+	case "Tab":
+		if len(e.candidates) > 0 {
+			idx := e.selectedIndex
+			if idx == 0 && len(e.candidates) > 1 {
+				idx = 1
+			}
+			if text, ok := e.selectCandidateLocked(idx); ok {
+				return Action{Handled: true, CommitText: text, UpdateUI: true}
+			}
+		}
+		raw := e.buffer
+		e.clearLocked()
+		return Action{Handled: true, CommitText: raw, UpdateUI: true}
+
+	case "Space":
+		if e.smartMode == "" && e.selectedIndex == 0 && len(e.candidates) > 0 && e.candidates[0].Text == e.buffer {
+			text := e.buffer + " "
+			e.lastCommittedRune = ' '
+			e.clearLocked()
+			return Action{Handled: true, CommitText: text, UpdateUI: true}
+		}
+		text, ok := e.selectCandidateLocked(e.selectedIndex)
+		if !ok {
+			text = e.buffer
+			e.clearLocked()
+		}
+		return Action{Handled: true, CommitText: text, UpdateUI: true}
+
+	case "Down", "Right":
+		ps := e.Config.PageSize
+		start := e.page * ps
+		pageLen := len(e.candidates) - start
+		if pageLen > ps {
+			pageLen = ps
+		}
+		if e.selectedIndex+1 < pageLen {
+			e.selectedIndex++
+		} else if (e.page+1)*ps < len(e.candidates) {
+			e.page++
+			e.selectedIndex = 0
+		}
+		return Action{Handled: true, UpdateUI: true}
+
+	case "Up", "Left":
+		ps := e.Config.PageSize
+		if e.selectedIndex > 0 {
+			e.selectedIndex--
+		} else if e.page > 0 {
+			e.page--
+			e.selectedIndex = ps - 1
+		}
+		return Action{Handled: true, UpdateUI: true}
+
+	case "Page_Down":
+		ps := e.Config.PageSize
+		if (e.page+1)*ps < len(e.candidates) {
+			e.page++
+			e.selectedIndex = 0
+		}
+		return Action{Handled: true, UpdateUI: true}
+
+	case "Page_Up":
+		if e.page > 0 {
+			e.page--
+			e.selectedIndex = 0
+		}
+		return Action{Handled: true, UpdateUI: true}
+	}
+
+	if ch == '@' && e.smartMode == "" {
+		e.smartMode = "email"
+		e.buffer += "@"
+		e.refreshCandidatesLocked()
+		return Action{Handled: true, UpdateUI: true}
+	}
+
+	lowBuf := strings.ToLower(e.buffer)
+	if ch == ':' && e.smartMode == "" && (lowBuf == "http" || lowBuf == "https" || lowBuf == "ftp") {
+		e.smartMode = "url"
+		e.buffer = lowBuf + "://"
+		e.refreshCandidatesLocked()
+		return Action{Handled: true, UpdateUI: true}
+	}
+	if ch == '.' && e.smartMode == "" && lowBuf == "www" {
+		e.smartMode = "url"
+		e.buffer = "www."
+		e.refreshCandidatesLocked()
+		return Action{Handled: true, UpdateUI: true}
+	}
+
+	if e.smartMode != "" {
+		if e.smartMode == "email" && strings.HasSuffix(e.buffer, "@") && ch >= '1' && ch <= '9' {
+			idx := int(ch - '1')
+			if idx < e.Config.PageSize {
+				if text, ok := e.selectCandidateLocked(idx); ok {
+					return Action{Handled: true, CommitText: text, UpdateUI: true}
+				}
+			}
+		}
+		if (e.smartMode == "email" && isSmartEmailChar(ch)) || (e.smartMode == "url" && isSmartURLChar(ch)) {
+			if len(e.buffer) < 128 {
+				e.buffer += string(ch)
+				e.refreshCandidatesLocked()
+			}
+			return Action{Handled: true, UpdateUI: true}
+		}
+		if ch >= 0x21 && ch <= 0x7E {
+			prefix, ok := e.selectCandidateLocked(e.selectedIndex)
+			if !ok {
+				prefix = e.buffer
+				e.clearLocked()
+			}
+			e.lastCommittedRune = ch
+			return Action{Handled: true, CommitText: prefix + string(ch), UpdateUI: true}
+		}
+		return Action{Handled: true}
+	}
+
+	if ch >= '1' && ch <= '9' {
+		idx := int(ch - '1')
+		if idx < e.Config.PageSize {
+			if text, ok := e.selectCandidateLocked(idx); ok {
+				return Action{Handled: true, CommitText: text, UpdateUI: true}
+			}
+		}
+		return Action{Handled: true}
+	}
+
+	if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '-' || ch == '\'' {
+		if len(e.buffer) < 64 {
+			e.buffer += string(ch)
+			e.refreshCandidatesLocked()
+		}
+		return Action{Handled: true, UpdateUI: true}
+	}
+
+	if ch >= 0x21 && ch <= 0x7E {
+		prefix := e.buffer
+		e.clearLocked()
+		e.lastCommittedRune = ch
+		return Action{Handled: true, CommitText: prefix + string(ch), UpdateUI: true}
+	}
+
 	return Action{Handled: false}
 }

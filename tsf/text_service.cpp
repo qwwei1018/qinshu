@@ -156,6 +156,7 @@ bool IsCandidateKey(UINT vk) {
     if (vk >= 'A' && vk <= 'Z') return true;
     if (vk >= '0' && vk <= '9') return true;
     switch (vk) {
+        case VK_TAB:
         case VK_SPACE:
         case VK_RETURN:
         case VK_BACK:
@@ -253,10 +254,12 @@ STDMETHODIMP CQinShuTextService::ActivateEx(ITfThreadMgr* ptim, TfClientId tid, 
     // 关键修复：打开键盘开关隔间并持续监听，否则 TSF 对中文输入法不派发任何按键（只能输出英文字母）
     EnsureKeyboardOpen();
     InitCompartmentSink();
+    SendPipeFocus(true);
     return S_OK;
 }
 
 STDMETHODIMP CQinShuTextService::Deactivate() {
+    SendPipeFocus(false);
     UninitCompartmentSink();
     UninitKeyEventSink();
     UninitThreadMgrEventSink();
@@ -397,6 +400,7 @@ STDMETHODIMP CQinShuTextService::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocume
         SendPipeFocus(false);
     } else {
         EnsureKeyboardOpen();
+        SendPipeFocus(true);
     }
     return S_OK;
 }
@@ -409,6 +413,7 @@ STDMETHODIMP CQinShuTextService::OnSetFocus(BOOL fForeground) {
         SendPipeFocus(false);
     } else {
         EnsureKeyboardOpen();
+        SendPipeFocus(true);
     }
     return S_OK;
 }

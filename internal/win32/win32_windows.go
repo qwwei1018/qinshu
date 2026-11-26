@@ -432,6 +432,56 @@ type KeyboardHook struct {
 
 var activeHook *KeyboardHook
 
+// InstallPassiveShiftObserver 在 TSF 模式下安装绝不拦截任何按键的只读 Shift 单击观察器（兼容 Electron/Chromium 等不转发独立 Shift KeyUp 的宿主）。
+func InstallPassiveShiftObserver(isActive func() bool, onShiftTap func()) (*KeyboardHook, error) {
+	h := &KeyboardHook{
+		hasBuffer:  isActive,
+		onShiftTap: onShiftTap,
+	}
+	activeHook = h
+	cb := syscall.NewCallback(passiveShiftProc)
+	id, _, err := procSetWindowsHookExW.Call(WH_KEYBOARD_LL, cb, 0, 0)
+	if id == 0 {
+		return nil, err
+	}
+	h.hookID = id
+	return h, nil
+}
+
+func passiveShiftProc(nCode int, wParam uintptr, lParam uintptr) uintptr {
+	h := activeHook
+	if nCode >= 0 && h != nil {
+		kb := (*kbdLLHookStruct)(unsafe.Pointer(lParam))
+		if (kb.Flags & LLKHF_INJECTED) == 0 {
+			if isKeyDown(VK_LWIN) || isKeyDown(VK_RWIN) || isKeyDown(VK_CONTROL) || isKeyDown(VK_LCONTROL) || isKeyDown(VK_RCONTROL) || isKeyDown(VK_MENU) || isKeyDown(VK_LMENU) || isKeyDown(VK_RMENU) {
+				h.shiftDownAlone = false
+			} else {
+				vk := kb.VkCode
+				if vk == VK_LSHIFT || vk == VK_RSHIFT || vk == VK_SHIFT {
+					if wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN {
+						h.shiftDownAlone = true
+					} else if wParam == WM_KEYUP || wParam == WM_SYSKEYUP {
+						if h.shiftDownAlone {
+							h.shiftDownAlone = false
+							if (h.hasBuffer == nil || h.hasBuffer()) && h.onShiftTap != nil {
+								h.onShiftTap()
+							}
+						}
+					}
+				} else if wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN {
+					h.shiftDownAlone = false
+				}
+			}
+		}
+	}
+	var hid uintptr
+	if h != nil {
+		hid = h.hookID
+	}
+	r, _, _ := procCallNextHookEx.Call(hid, uintptr(nCode), wParam, lParam)
+	return r
+}
+
 // InstallHook 在当前线程安装 WH_KEYBOARD_LL 全局键盘钩子（需配合 Win32 消息循环）。
 func InstallHook(
 	hasBuffer func() bool,

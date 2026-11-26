@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"qinshu/internal/config"
@@ -31,6 +32,7 @@ const (
 	WM_RBUTTONUP     = 0x0205
 	WM_USER          = 0x0400
 	wmRefreshUI      = WM_USER + 101
+	wmShiftTap       = WM_USER + 102
 
 	MA_NOACTIVATE = 3
 
@@ -152,12 +154,51 @@ type App struct {
 	hasTSFCaret bool
 	tsfCaretX   int32
 	tsfCaretY   int32
+
+	shiftMu      sync.Mutex
+	tsfActive    bool
+	lastShiftTap time.Time
 }
 
 var activeApp *App
 
 func (a *App) s(px int32) int32 {
 	return (px*a.dpi + 48) / 96
+}
+
+func (a *App) setTSFActive(active bool) {
+	a.shiftMu.Lock()
+	a.tsfActive = active
+	a.shiftMu.Unlock()
+}
+
+func (a *App) isTSFActive() bool {
+	a.shiftMu.Lock()
+	v := a.tsfActive
+	a.shiftMu.Unlock()
+	return v
+}
+
+func (a *App) handleShiftTap(sendAsync bool) string {
+	a.shiftMu.Lock()
+	now := time.Now()
+	if !a.lastShiftTap.IsZero() && now.Sub(a.lastShiftTap) < 180*time.Millisecond {
+		a.shiftMu.Unlock()
+		return ""
+	}
+	a.lastShiftTap = now
+	a.shiftMu.Unlock()
+
+	committed := a.eng.ToggleLanguage()
+	if sendAsync {
+		if committed != "" {
+			SendUnicodeTextAsync(committed)
+		}
+		a.refreshAllWindows()
+		return ""
+	}
+	a.postRefresh()
+	return committed
 }
 
 func (a *App) setTSFCaret(x, y int32) {
@@ -221,10 +262,11 @@ func RunApp(eng *engine.Engine, baseDir string, tsfMode bool) error {
 	}
 
 	if tsfMode {
-		// 原生 TSF 模式：不安装 WH_KEYBOARD_LL 钩子，仅监听轻量 Named Pipe
+		// 原生 TSF 模式：监听轻量 Named Pipe，并安装只读 Shift 观察器兜底 Electron/Chromium 等宿主
 		stopPipe := StartTSFPipeServer(PipeServerHandler{
 			HasBuffer: app.eng.HasActiveBuffer,
 			OnKey: func(keyName string, ch rune, ctrl, alt, shift bool, x, y int32) (bool, string) {
+				app.setTSFActive(true)
 				app.setTSFCaret(x, y)
 				act := app.eng.HandleKey(keyName, ch, ctrl, alt, shift)
 				if act.UpdateUI {
@@ -233,12 +275,12 @@ func RunApp(eng *engine.Engine, baseDir string, tsfMode bool) error {
 				return act.Handled, act.CommitText
 			},
 			OnShiftTap: func(x, y int32) string {
+				app.setTSFActive(true)
 				app.setTSFCaret(x, y)
-				committed := app.eng.ToggleLanguage()
-				app.postRefresh()
-				return committed
+				return app.handleShiftTap(false)
 			},
 			OnFocus: func(focused bool) {
+				app.setTSFActive(focused)
 				if !focused && app.eng.HasActiveBuffer() {
 					app.eng.Clear()
 					app.postRefresh()
@@ -246,6 +288,15 @@ func RunApp(eng *engine.Engine, baseDir string, tsfMode bool) error {
 			},
 		})
 		defer close(stopPipe)
+
+		if obs, err := InstallPassiveShiftObserver(app.isTSFActive, func() {
+			if app.statusHwnd != 0 {
+				_, _, _ = procPostMessageW.Call(app.statusHwnd, wmShiftTap, 0, 0)
+			}
+		}); err == nil {
+			app.hook = obs
+			defer app.hook.Uninstall()
+		}
 	} else {
 		// 绿色免安装模式：安装全局低级键盘钩子
 		hook, err := InstallHook(
@@ -603,15 +654,15 @@ func (a *App) paintCandidateBar(hwnd uintptr) {
 			modeTag = "邮箱"
 		} else if state.SmartMode == "url" {
 			modeTag = "网址"
-		} else if state.TempEnglish {
-			modeTag = "临时英文"
+		} else if state.TempEnglish || state.Language == config.LangEn {
+			modeTag = "英文"
 		} else if state.InputMode == config.ModeWubi {
 			modeTag = "五笔"
 		} else if state.InputMode == config.ModePinyin {
 			modeTag = "拼音"
 		}
 		fuzzyTag := ""
-		if state.FuzzyEnabled && !state.TempEnglish && state.SmartMode == "" && state.InputMode != config.ModeWubi {
+		if state.FuzzyEnabled && !state.TempEnglish && state.Language != config.LangEn && state.SmartMode == "" && state.InputMode != config.ModeWubi {
 			fuzzyTag = "·糊"
 		}
 		headerText := fmt.Sprintf("%s  [%s%s]", state.Buffer, modeTag, fuzzyTag)
@@ -832,6 +883,9 @@ func statusWndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		return 1
 	case wmRefreshUI:
 		a.refreshAllWindows()
+		return 0
+	case wmShiftTap:
+		a.handleShiftTap(true)
 		return 0
 	case WM_PAINT:
 		a.paintStatusBar(hwnd)

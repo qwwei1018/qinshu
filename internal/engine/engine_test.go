@@ -279,3 +279,77 @@ func TestSmartEmailAndURLRecognition(t *testing.T) {
 		t.Fatalf("expected www.google.com, got %+v", vs)
 	}
 }
+
+
+func TestEnglishModeSmartCompletionEmailAndURL(t *testing.T) {
+	eng, _ := setupTestEngine(t)
+	eng.SetInputMode(config.ModeMixed)
+	eng.ToggleLanguage()
+	if eng.Config.Language != config.LangEn {
+		t.Fatalf("expected LangEn after ToggleLanguage")
+	}
+
+	// 1. 英文智能单词补全：hel -> 候选含 hello，Tab 自动补全
+	typeSeq(eng, "hel")
+	vs := eng.GetViewState()
+	if !vs.Visible || vs.Language != config.LangEn || len(vs.PageCandidates) < 2 {
+		t.Fatalf("expected English smart candidates for 'hel', got %+v", vs)
+	}
+	if vs.PageCandidates[0].Text != "hel" {
+		t.Fatalf("expected raw 'hel' first, got %+v", vs.PageCandidates[0])
+	}
+	act := eng.HandleKey("Tab", 0, false, false, false)
+	if act.CommitText == "" || !strings.HasPrefix(act.CommitText, "hel") || act.CommitText == "hel" {
+		t.Fatalf("expected Tab to commit smart English completion, got %q", act.CommitText)
+	}
+
+	// 2. 英文模式下空格默认上屏单词 + 空格，流畅连续打字
+	typeSeq(eng, "world")
+	act = eng.HandleKey("Space", ' ', false, false, false)
+	if act.CommitText != "world " {
+		t.Fatalf("expected 'world ', got %q", act.CommitText)
+	}
+
+	// 3. 英文模式下半角标点直接跟随单词上屏，空缓冲标点直通
+	typeSeq(eng, "ok")
+	act = eng.HandleKey("comma", ',', false, false, false)
+	if act.CommitText != "ok," {
+		t.Fatalf("expected half-width 'ok,', got %q", act.CommitText)
+	}
+	act = eng.HandleKey("period", '.', false, false, false)
+	if act.Handled {
+		t.Fatalf("expected empty-buffer punctuation in En mode to pass through")
+	}
+
+	// 4. 英文模式下智能邮箱 zxc@ -> gmail.com / qq.com
+	typeSeq(eng, "zxc@")
+	vs = eng.GetViewState()
+	if vs.SmartMode != "email" || len(vs.PageCandidates) < 2 || vs.PageCandidates[0].Text != "zxc@gmail.com" {
+		t.Fatalf("expected smart email in En mode, got %+v", vs)
+	}
+	act = eng.HandleKey("2", '2', false, false, false)
+	if act.CommitText != "zxc@qq.com" {
+		t.Fatalf("expected 'zxc@qq.com', got %q", act.CommitText)
+	}
+
+	// 5. 英文模式下智能网址 http:// 与 www.
+	typeSeq(eng, "http")
+	eng.HandleKey("semicolon", ':', false, false, true)
+	typeSeq(eng, "baidu")
+	vs = eng.GetViewState()
+	if vs.SmartMode != "url" || len(vs.PageCandidates) == 0 || vs.PageCandidates[0].Text != "http://baidu.com" {
+		t.Fatalf("expected http://baidu.com in En mode, got %+v", vs)
+	}
+	act = eng.HandleKey("Space", ' ', false, false, false)
+	if act.CommitText != "http://baidu.com" {
+		t.Fatalf("expected commit http://baidu.com, got %q", act.CommitText)
+	}
+
+	// 6. 中文模式下 4 字母邮箱前缀（如 test@）不被四码上屏吞掉
+	eng.ToggleLanguage()
+	typeSeq(eng, "test@")
+	vs = eng.GetViewState()
+	if vs.SmartMode != "email" || vs.Buffer != "test@" || vs.PageCandidates[0].Text != "test@gmail.com" {
+		t.Fatalf("expected smart email for test@ in Zh mode, got %+v", vs)
+	}
+}

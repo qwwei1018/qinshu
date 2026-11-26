@@ -17,7 +17,7 @@
 
 ## 下载与安装（Releases）
 
-1. 前往本仓库 [Releases](https://github.com/qwwei1018/qinshu/releases) 下载最新版本的压缩包（例如 `QinShu-IME-TSF-Win11-Full-v2.0.1.zip`）并解压。
+1. 前往本仓库 [Releases](https://github.com/qwwei1018/qinshu/releases) 下载最新版本的压缩包（例如 `QinShu-IME-TSF-Win11-Full-v2.0.2.zip`）并解压。
 2. 双击运行 **`安装_Qin书TSF.bat`**（自动复制文件至 `C:\Program Files\QinShu`，注册 x64/x86 TSF COM 组件，配置开机自启并启动后台服务）。
 3. 按 **`Win + Space`** 切换到 **「Qin书」** 即可开始输入。
 4. 如需卸载，双击运行 **`卸载_Qin书TSF.bat`**。
@@ -60,7 +60,11 @@
 
 ## 版本记录
 
+- **v2.0.2**
+  - 修复 Win11 TSF 模式下在 Chromium/Electron 等应用中单击 `Shift` 无法切换中英文的问题（TSF 激活/焦点同步 + 只读被动 Shift 观察器兜底）；
+  - 全面升级英文模式（`En`）：内置 5,019 词高频英文词库支持智能单词补全（`1-9` / `Tab` / 方向键选词，空格流畅连打），并完整支持智能邮箱（`zxc@`）与智能网址（`http:` / `https:` / `www.`）补全；
 - **v2.0.1**
   - 替换内置码表为标准 Rime 五笔 86 大码表（94,049 条）并扩充 Rime-Ice 标准简体拼音大词库（128,548 条）；
   - 修复 Windows 11 TSF `OPENCLOSE` / `CONVERSION` 隔间作用域问题、命名管道低完整性权限及 GC 悬空指针问题；
   - 新增 TSF 后端自动拉起机制与安装脚本占用 DLL 替换兜底。
+
