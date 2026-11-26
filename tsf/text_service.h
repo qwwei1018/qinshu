@@ -6,7 +6,8 @@
 
 class CQinShuTextService : public ITfTextInputProcessorEx,
                            public ITfThreadMgrEventSink,
-                           public ITfKeyEventSink {
+                           public ITfKeyEventSink,
+                           public ITfCompartmentEventSink {
 public:
     CQinShuTextService();
     ~CQinShuTextService();
@@ -38,19 +39,29 @@ public:
     STDMETHODIMP OnKeyUp(ITfContext* pic, WPARAM wParam, LPARAM lParam, BOOL* pfEaten) override;
     STDMETHODIMP OnPreservedKey(ITfContext* pic, REFGUID rguid, BOOL* pfEaten) override;
 
+    // ITfCompartmentEventSink
+    STDMETHODIMP OnChange(REFGUID rguid) override;
+
 private:
     bool InitThreadMgrEventSink();
     void UninitThreadMgrEventSink();
     bool InitKeyEventSink();
     void UninitKeyEventSink();
+    void InitCompartmentSink();
+    void UninitCompartmentSink();
+    // 中文 (0x0804) TIP 必须打开 GUID_COMPARTMENT_KEYBOARD_OPENCLOSE，TSF 才会把按键派发给输入法
+    void EnsureKeyboardOpen();
 
     POINT GetCaretPos(ITfContext* pic);
     void CommitTextToContext(ITfContext* pic, const std::wstring& text);
+    // 将按键发送给 Go 引擎；返回 true 表示需要吞掉该键，结果写入 out
+    bool ProcessKeyThroughEngine(ITfContext* pic, UINT vk, struct PipeResponse* out);
 
     LONG m_refCount;
     ITfThreadMgr* m_pThreadMgr;
     TfClientId m_tfClientId;
     DWORD m_threadMgrEventSinkCookie;
+    DWORD m_compartmentSinkCookie;
     bool m_shiftDownAlone;
 };
 

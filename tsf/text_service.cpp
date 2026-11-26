@@ -195,6 +195,7 @@ CQinShuTextService::CQinShuTextService()
       m_pThreadMgr(nullptr),
       m_tfClientId(TF_CLIENTID_NULL),
       m_threadMgrEventSinkCookie(TF_INVALID_COOKIE),
+      m_compartmentSinkCookie(TF_INVALID_COOKIE),
       m_shiftDownAlone(false) {
     InterlockedIncrement(&g_dllRefCount);
 }
@@ -214,6 +215,8 @@ STDMETHODIMP CQinShuTextService::QueryInterface(REFIID riid, void** ppvObj) {
         *ppvObj = static_cast<ITfThreadMgrEventSink*>(this);
     } else if (IsEqualIID(riid, IID_ITfKeyEventSink)) {
         *ppvObj = static_cast<ITfKeyEventSink*>(this);
+    } else if (IsEqualIID(riid, IID_ITfCompartmentEventSink)) {
+        *ppvObj = static_cast<ITfCompartmentEventSink*>(this);
     }
     if (*ppvObj) {
         AddRef();
@@ -241,14 +244,20 @@ STDMETHODIMP CQinShuTextService::ActivateEx(ITfThreadMgr* ptim, TfClientId tid, 
     if (m_pThreadMgr) m_pThreadMgr->AddRef();
     m_tfClientId = tid;
 
-    if (!InitThreadMgrEventSink() || !InitKeyEventSink()) {
+    bool okTm = InitThreadMgrEventSink();
+    bool okKey = okTm && InitKeyEventSink();
+    if (!okTm || !okKey) {
         Deactivate();
         return E_FAIL;
     }
+    // 关键修复：打开键盘开关隔间并持续监听，否则 TSF 对中文输入法不派发任何按键（只能输出英文字母）
+    EnsureKeyboardOpen();
+    InitCompartmentSink();
     return S_OK;
 }
 
 STDMETHODIMP CQinShuTextService::Deactivate() {
+    UninitCompartmentSink();
     UninitKeyEventSink();
     UninitThreadMgrEventSink();
     if (m_pThreadMgr) {
@@ -256,6 +265,79 @@ STDMETHODIMP CQinShuTextService::Deactivate() {
         m_pThreadMgr = nullptr;
     }
     m_tfClientId = TF_CLIENTID_NULL;
+    return S_OK;
+}
+
+void CQinShuTextService::EnsureKeyboardOpen() {
+    if (!m_pThreadMgr || m_tfClientId == TF_CLIENTID_NULL) return;
+    ITfCompartmentMgr* pCompMgr = nullptr;
+    if (FAILED(m_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, reinterpret_cast<void**>(&pCompMgr))) || !pCompMgr) {
+        return;
+    }
+
+    auto setIntCompartment = [&](REFGUID guid, LONG targetVal) {
+        ITfCompartment* pComp = nullptr;
+        if (SUCCEEDED(pCompMgr->GetCompartment(guid, &pComp)) && pComp) {
+            VARIANT cur;
+            ZeroMemory(&cur, sizeof(cur));
+            bool alreadySet = SUCCEEDED(pComp->GetValue(&cur)) && cur.vt == VT_I4 && cur.lVal == targetVal;
+            if (!alreadySet) {
+                VARIANT v;
+                ZeroMemory(&v, sizeof(v));
+                v.vt = VT_I4;
+                v.lVal = targetVal;
+                pComp->SetValue(m_tfClientId, &v);
+            }
+            pComp->Release();
+        }
+    };
+
+    setIntCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, 1);
+    setIntCompartment(GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION, 0x0001 /* TF_CONVERSIONMODE_NATIVE */);
+    pCompMgr->Release();
+}
+
+void CQinShuTextService::InitCompartmentSink() {
+    if (!m_pThreadMgr || m_compartmentSinkCookie != TF_INVALID_COOKIE) return;
+    ITfCompartmentMgr* pCompMgr = nullptr;
+    if (FAILED(m_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, reinterpret_cast<void**>(&pCompMgr))) || !pCompMgr) return;
+    ITfCompartment* pComp = nullptr;
+    if (SUCCEEDED(pCompMgr->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &pComp)) && pComp) {
+        ITfSource* pSource = nullptr;
+        if (SUCCEEDED(pComp->QueryInterface(IID_ITfSource, reinterpret_cast<void**>(&pSource))) && pSource) {
+            pSource->AdviseSink(IID_ITfCompartmentEventSink,
+                                static_cast<ITfCompartmentEventSink*>(this),
+                                &m_compartmentSinkCookie);
+            pSource->Release();
+        }
+        pComp->Release();
+    }
+    pCompMgr->Release();
+}
+
+void CQinShuTextService::UninitCompartmentSink() {
+    if (!m_pThreadMgr || m_compartmentSinkCookie == TF_INVALID_COOKIE) return;
+    ITfCompartmentMgr* pCompMgr = nullptr;
+    if (SUCCEEDED(m_pThreadMgr->QueryInterface(IID_ITfCompartmentMgr, reinterpret_cast<void**>(&pCompMgr))) && pCompMgr) {
+        ITfCompartment* pComp = nullptr;
+        if (SUCCEEDED(pCompMgr->GetCompartment(GUID_COMPARTMENT_KEYBOARD_OPENCLOSE, &pComp)) && pComp) {
+            ITfSource* pSource = nullptr;
+            if (SUCCEEDED(pComp->QueryInterface(IID_ITfSource, reinterpret_cast<void**>(&pSource))) && pSource) {
+                pSource->UnadviseSink(m_compartmentSinkCookie);
+                pSource->Release();
+            }
+            pComp->Release();
+        }
+        pCompMgr->Release();
+    }
+    m_compartmentSinkCookie = TF_INVALID_COOKIE;
+}
+
+STDMETHODIMP CQinShuTextService::OnChange(REFGUID rguid) {
+    // 系统热键或其他程序关闭了键盘开关时立即重新打开（中英文切换由 Qin书 引擎自身的 Shift 处理）
+    if (IsEqualGUID(rguid, GUID_COMPARTMENT_KEYBOARD_OPENCLOSE)) {
+        EnsureKeyboardOpen();
+    }
     return S_OK;
 }
 
@@ -313,6 +395,8 @@ STDMETHODIMP CQinShuTextService::OnSetFocus(ITfDocumentMgr* pdimFocus, ITfDocume
         g_hasPendingResp = false;
         g_pendingResp = PipeResponse{};
         SendPipeFocus(false);
+    } else {
+        EnsureKeyboardOpen();
     }
     return S_OK;
 }
@@ -323,6 +407,8 @@ STDMETHODIMP CQinShuTextService::OnSetFocus(BOOL fForeground) {
         g_hasPendingResp = false;
         g_pendingResp = PipeResponse{};
         SendPipeFocus(false);
+    } else {
+        EnsureKeyboardOpen();
     }
     return S_OK;
 }
@@ -354,28 +440,22 @@ void CQinShuTextService::CommitTextToContext(ITfContext* pic, const std::wstring
     pSession->Release();
 }
 
-STDMETHODIMP CQinShuTextService::OnTestKeyDown(ITfContext* pic, WPARAM wParam, LPARAM /*lParam*/, BOOL* pfEaten) {
-    if (!pfEaten) return E_INVALIDARG;
-    *pfEaten = FALSE;
-    g_hasPendingResp = false;
-
-    UINT vk = static_cast<UINT>(wParam & 0xFF);
-
+bool CQinShuTextService::ProcessKeyThroughEngine(ITfContext* pic, UINT vk, PipeResponse* out) {
     // 放行 Win 键组合
     if (IsKeyDown(VK_LWIN) || IsKeyDown(VK_RWIN)) {
         m_shiftDownAlone = false;
-        return S_OK;
+        return false;
     }
 
     // Shift 单击追踪（不吞 Shift 键本身，避免宿主程序 Shift 粘滞）
     if (vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT) {
         m_shiftDownAlone = true;
-        return S_OK;
+        return false;
     }
     m_shiftDownAlone = false;
 
     if (!IsCandidateKey(vk)) {
-        return S_OK;
+        return false;
     }
 
     bool ctrl = IsKeyDown(VK_CONTROL) || IsKeyDown(VK_LCONTROL) || IsKeyDown(VK_RCONTROL);
@@ -383,7 +463,7 @@ STDMETHODIMP CQinShuTextService::OnTestKeyDown(ITfContext* pic, WPARAM wParam, L
     bool shift = IsKeyDown(VK_SHIFT) || IsKeyDown(VK_LSHIFT) || IsKeyDown(VK_RSHIFT);
 
     if (alt) {
-        return S_OK;
+        return false;
     }
 
     // CapsLock 开启时由 Go 后端判断（无编码缓冲时直接放行大写英文）
@@ -391,7 +471,28 @@ STDMETHODIMP CQinShuTextService::OnTestKeyDown(ITfContext* pic, WPARAM wParam, L
     POINT pt = GetCaretPos(pic);
     PipeResponse resp = SendPipeKeyEvent(vk, ch, ctrl, alt, shift, pt.x, pt.y);
 
-    if (resp.action != PipeAction::PassThrough) {
+    if (resp.action == PipeAction::PassThrough) {
+        return false;
+    }
+    *out = std::move(resp);
+    return true;
+}
+
+STDMETHODIMP CQinShuTextService::OnTestKeyDown(ITfContext* pic, WPARAM wParam, LPARAM /*lParam*/, BOOL* pfEaten) {
+    if (!pfEaten) return E_INVALIDARG;
+    *pfEaten = FALSE;
+
+    UINT vk = static_cast<UINT>(wParam & 0xFF);
+
+    // 部分宿主会对同一按键重复调用 TestKeyDown：复用已缓存结果，避免同一个键被引擎处理两次
+    if (g_hasPendingResp && g_pendingVk == vk) {
+        *pfEaten = TRUE;
+        return S_OK;
+    }
+    g_hasPendingResp = false;
+
+    PipeResponse resp;
+    if (ProcessKeyThroughEngine(pic, vk, &resp)) {
         *pfEaten = TRUE;
         g_hasPendingResp = true;
         g_pendingVk = vk;
@@ -405,13 +506,24 @@ STDMETHODIMP CQinShuTextService::OnKeyDown(ITfContext* pic, WPARAM wParam, LPARA
     *pfEaten = FALSE;
 
     UINT vk = static_cast<UINT>(wParam & 0xFF);
+
+    PipeResponse resp;
+    bool eaten = false;
     if (g_hasPendingResp && g_pendingVk == vk) {
-        g_hasPendingResp = false;
+        resp = std::move(g_pendingResp);
+        eaten = true;
+    } else {
+        // 宿主未先调用 OnTestKeyDown（直接 KeyDown）时在此完成处理
+        eaten = ProcessKeyThroughEngine(pic, vk, &resp);
+    }
+    g_hasPendingResp = false;
+    g_pendingResp = PipeResponse{};
+
+    if (eaten) {
         *pfEaten = TRUE;
-        if (g_pendingResp.action == PipeAction::Commit && !g_pendingResp.commitText.empty()) {
-            CommitTextToContext(pic, g_pendingResp.commitText);
+        if (resp.action == PipeAction::Commit && !resp.commitText.empty()) {
+            CommitTextToContext(pic, resp.commitText);
         }
-        g_pendingResp = PipeResponse{};
     }
     return S_OK;
 }
@@ -421,6 +533,10 @@ STDMETHODIMP CQinShuTextService::OnTestKeyUp(ITfContext* pic, WPARAM wParam, LPA
     // 绝不吞掉 Shift 的 KeyUp，防止宿主应用（Chrome/VS Code/记事本）Shift 状态粘滞！
     *pfEaten = FALSE;
     UINT vk = static_cast<UINT>(wParam & 0xFF);
+    if (g_hasPendingResp && g_pendingVk == vk) {
+        g_hasPendingResp = false;
+        g_pendingResp = PipeResponse{};
+    }
     if ((vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT) && m_shiftDownAlone) {
         m_shiftDownAlone = false;
         POINT pt = GetCaretPos(pic);
@@ -432,8 +548,13 @@ STDMETHODIMP CQinShuTextService::OnTestKeyUp(ITfContext* pic, WPARAM wParam, LPA
     return S_OK;
 }
 
-STDMETHODIMP CQinShuTextService::OnKeyUp(ITfContext* /*pic*/, WPARAM /*wParam*/, LPARAM /*lParam*/, BOOL* pfEaten) {
+STDMETHODIMP CQinShuTextService::OnKeyUp(ITfContext* /*pic*/, WPARAM wParam, LPARAM /*lParam*/, BOOL* pfEaten) {
     if (pfEaten) *pfEaten = FALSE;
+    UINT vk = static_cast<UINT>(wParam & 0xFF);
+    if (g_hasPendingResp && g_pendingVk == vk) {
+        g_hasPendingResp = false;
+        g_pendingResp = PipeResponse{};
+    }
     return S_OK;
 }
 

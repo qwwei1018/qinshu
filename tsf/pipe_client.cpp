@@ -1,10 +1,58 @@
 #include "pipe_client.h"
 #include "guids.h"
+#include "text_service.h"
 
 #include <cstdio>
+#include <cwchar>
 #include <vector>
 
 namespace {
+
+void TryLaunchBackendIfMissing() {
+    static ULONGLONG lastAttempt = 0;
+    ULONGLONG now = GetTickCount64();
+    if (lastAttempt != 0 && (now - lastAttempt) < 3000) {
+        return;
+    }
+    lastAttempt = now;
+
+    if (!g_hInst) return;
+    wchar_t dllDir[MAX_PATH] = {};
+    DWORD len = GetModuleFileNameW(g_hInst, dllDir, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) return;
+    wchar_t* slash = std::wcsrchr(dllDir, L'\\');
+    if (!slash) return;
+    *slash = L'\0';
+
+    std::wstring exePath = std::wstring(dllDir) + L"\\Qin书.exe";
+    if (GetFileAttributesW(exePath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        return;
+    }
+
+    std::wstring cmdLine = L"\"" + exePath + L"\" --tsf";
+    std::vector<wchar_t> cmdBuf(cmdLine.begin(), cmdLine.end());
+    cmdBuf.push_back(L'\0');
+
+    STARTUPINFOW si = {};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi = {};
+    BOOL ok = CreateProcessW(
+        exePath.c_str(),
+        cmdBuf.data(),
+        nullptr,
+        nullptr,
+        FALSE,
+        DETACHED_PROCESS | CREATE_NO_WINDOW,
+        nullptr,
+        dllDir,
+        &si,
+        &pi
+    );
+    if (ok) {
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+}
 
 int HexVal(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -69,6 +117,10 @@ PipeResponse SendPipeCommand(const std::string& line) {
         }
     }
     if (hPipe == INVALID_HANDLE_VALUE) {
+        DWORD err = GetLastError();
+        if (err == ERROR_FILE_NOT_FOUND && line != "F 0\n") {
+            TryLaunchBackendIfMissing();
+        }
         return resp;
     }
 

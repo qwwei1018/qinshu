@@ -33,9 +33,21 @@ if not exist "Qin书.exe" (
 echo [1/4] 停止旧进程并复制文件至 %INSTALL_DIR% ...
 taskkill /f /im "Qin书.exe" >nul 2>&1
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+del /f /q "%INSTALL_DIR%\QinShuTSF_*.dll.old*" >nul 2>&1
+del /f /q "%INSTALL_DIR%\QinShuTSF_*.old*.dll" >nul 2>&1
 copy /y "Qin书.exe" "%INSTALL_DIR%\" >nul
-copy /y "QinShuTSF_x64.dll" "%INSTALL_DIR%\" >nul
-if exist "QinShuTSF_x86.dll" copy /y "QinShuTSF_x86.dll" "%INSTALL_DIR%\" >nul
+copy /y "QinShuTSF_x64.dll" "%INSTALL_DIR%\" >nul 2>&1
+if %errorlevel% neq 0 (
+    move /y "%INSTALL_DIR%\QinShuTSF_x64.dll" "%INSTALL_DIR%\QinShuTSF_x64.dll.old.%RANDOM%" >nul 2>&1
+    copy /y "QinShuTSF_x64.dll" "%INSTALL_DIR%\" >nul
+)
+if exist "QinShuTSF_x86.dll" (
+    copy /y "QinShuTSF_x86.dll" "%INSTALL_DIR%\" >nul 2>&1
+    if %errorlevel% neq 0 (
+        move /y "%INSTALL_DIR%\QinShuTSF_x86.dll" "%INSTALL_DIR%\QinShuTSF_x86.dll.old.%RANDOM%" >nul 2>&1
+        copy /y "QinShuTSF_x86.dll" "%INSTALL_DIR%\" >nul
+    )
+)
 xcopy /e /i /y "data" "%INSTALL_DIR%\data" >nul
 if exist "assets" xcopy /e /i /y "assets" "%INSTALL_DIR%\assets" >nul
 
@@ -56,7 +68,7 @@ powershell -NoProfile -Command ^
   "$s.Save()"
 
 echo [4/4] 启动 Qin书 轻量 Go 后端服务...
-start "" "%INSTALL_DIR%\Qin书.exe" --tsf
+start "" /D "%INSTALL_DIR%" "%INSTALL_DIR%\Qin书.exe" --tsf
 
 echo.
 echo 安装完成！请按 Win + Space 在系统语言栏切换到「Qin书」开始使用。
