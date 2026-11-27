@@ -2,10 +2,16 @@ package com.qinshu.ime
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
+import android.view.View
+import android.view.Window
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
@@ -31,13 +37,15 @@ class SettingsActivity : Activity() {
     private lateinit var userStore: UserDictStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
         super.onCreate(savedInstanceState)
+        actionBar?.hide()
         prefs = PrefsManager(this)
         userStore = UserDictStore(this)
 
         val verName = runCatching {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.0"
-        }.getOrDefault("1.0.0")
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.1.1"
+        }.getOrDefault("1.1.1")
 
         val d = resources.displayMetrics.density
         val pad = (20 * d).toInt()
@@ -186,7 +194,44 @@ class SettingsActivity : Activity() {
             }
         })
 
-        setContentView(ScrollView(this).apply { addView(root) })
+        val scroll = ScrollView(this).apply {
+            clipToPadding = false
+            addView(root)
+        }
+        scroll.setOnApplyWindowInsetsListener { v, insets ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val bars = insets.getInsets(
+                    WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+                )
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                v.setPadding(
+                    insets.systemWindowInsetLeft,
+                    insets.systemWindowInsetTop,
+                    insets.systemWindowInsetRight,
+                    insets.systemWindowInsetBottom,
+                )
+            }
+            insets
+        }
+        setContentView(scroll)
+        scroll.requestApplyInsets()
+
+        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.setSystemBarsAppearance(
+                if (isNight) 0 else WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = if (isNight) {
+                0
+            } else {
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+        }
     }
 
     private fun sectionTitle(title: String, d: Float): TextView = TextView(this).apply {
