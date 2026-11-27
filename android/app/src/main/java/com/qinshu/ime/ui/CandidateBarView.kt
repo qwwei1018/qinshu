@@ -69,11 +69,15 @@ class CandidateBarView(context: Context) : LinearLayout(context) {
         }
         candidates.forEachIndexed { idx, cand ->
             val tv = TextView(context).apply {
-                text = cand.text
-                setTextSize(
-                    TypedValue.COMPLEX_UNIT_SP,
-                    if (cand.source == "emoji" && !cand.text.startsWith("[")) 18f else 16f,
-                )
+                if (cand.source == "emoji" && WeChatEmojiDrawable.supports(cand.text)) {
+                    text = WeChatEmojiDrawable.toSpannable(cand.text, (22 * density).toInt())
+                } else {
+                    text = cand.text
+                    setTextSize(
+                        TypedValue.COMPLEX_UNIT_SP,
+                        if (cand.source == "emoji" && !cand.text.startsWith("[")) 18f else 16f,
+                    )
+                }
                 setTextColor(if (idx == 0) theme.keyAccentBg else theme.keyText)
                 setPadding((10 * density).toInt(), (6 * density).toInt(), (10 * density).toInt(), (6 * density).toInt())
                 setOnClickListener { listener?.onCandidateClick(cand, idx) }
