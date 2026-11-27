@@ -15,6 +15,8 @@ import kotlin.math.abs
 
 enum class KeyboardPage { QWERTY, T9, NUM_SYM }
 
+enum class ShiftState { OFF, ONCE, LOCKED }
+
 enum class KeyAction {
     CHAR, BACKSPACE, ENTER, SPACE, SHIFT,
     SWITCH_LANG, SWITCH_LAYOUT, SWITCH_NUM, SWITCH_EMOJI,
@@ -62,10 +64,24 @@ class KeyboardCanvasView(context: Context) : View(context) {
     private var page: KeyboardPage = KeyboardPage.QWERTY
     private var activeLayoutMode: LayoutMode = LayoutMode.QWERTY
     private var lang: LanguageMode = LanguageMode.ZH
-    private var shifted: Boolean = false
+    private var shiftState: ShiftState = ShiftState.OFF
+    private var lastShiftTapMs: Long = 0L
+    private var shiftLongPressed: Boolean = false
     private var t9Syllables: List<String> = emptyList()
     private var heightPercent: Int = 100
     private var oneHandedMode: OneHandedMode = OneHandedMode.OFF
+
+    private val shiftLongPressRunnable = Runnable {
+        if (pressedKey?.action == KeyAction.SHIFT && lang == LanguageMode.EN) {
+            shiftLongPressed = true
+            shiftState = ShiftState.LOCKED
+            if (hapticEnabled) {
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            }
+            rebuildKeys()
+            invalidate()
+        }
+    }
 
     val isNumPage: Boolean
         get() = page == KeyboardPage.NUM_SYM
@@ -107,6 +123,9 @@ class KeyboardCanvasView(context: Context) : View(context) {
     fun setState(layoutMode: LayoutMode, languageMode: LanguageMode, pageOverride: KeyboardPage? = null) {
         activeLayoutMode = layoutMode
         lang = languageMode
+        if (languageMode != LanguageMode.EN) {
+            shiftState = ShiftState.OFF
+        }
         val nextPage = pageOverride ?: if (layoutMode == LayoutMode.T9 && languageMode == LanguageMode.ZH) {
             KeyboardPage.T9
         } else {
@@ -192,9 +211,10 @@ class KeyboardCanvasView(context: Context) : View(context) {
         val r2 = "asdfghjkl"
         val r3 = "zxcvbnm"
 
+        val isUpper = shiftState != ShiftState.OFF && lang == LanguageMode.EN
         val kw1 = (w - gap * (r1.length + 1)) / r1.length
         r1.forEachIndexed { i, c ->
-            val ch = if (shifted && lang == LanguageMode.EN) c.uppercaseChar() else c
+            val ch = if (isUpper) c.uppercaseChar() else c
             val x = xOff + gap + i * (kw1 + gap)
             keys.add(KeySpec(ch.toString(), "", KeyAction.CHAR, ch, rect = RectF(x, gap, x + kw1, gap + rowH)))
         }
@@ -202,24 +222,27 @@ class KeyboardCanvasView(context: Context) : View(context) {
         val y2 = gap * 2 + rowH
         val x2Start = xOff + (w - (r2.length * kw1 + (r2.length - 1) * gap)) / 2f
         r2.forEachIndexed { i, c ->
-            val ch = if (shifted && lang == LanguageMode.EN) c.uppercaseChar() else c
+            val ch = if (isUpper) c.uppercaseChar() else c
             val x = x2Start + i * (kw1 + gap)
             keys.add(KeySpec(ch.toString(), "", KeyAction.CHAR, ch, rect = RectF(x, y2, x + kw1, y2 + rowH)))
         }
 
         val y3 = gap * 3 + rowH * 2
         val sideW = (w - (7 * kw1 + 10 * gap)) / 2f
+        val isEn = lang == LanguageMode.EN
         keys.add(
             KeySpec(
-                label = if (lang == LanguageMode.EN) (if (shifted) "⇧" else "⇪") else "分词",
-                action = if (lang == LanguageMode.EN) KeyAction.SHIFT else KeyAction.CHAR,
+                label = if (isEn) "⇧" else "分词",
+                subLabel = if (isEn && shiftState == ShiftState.LOCKED) "锁定" else "",
+                action = if (isEn) KeyAction.SHIFT else KeyAction.CHAR,
                 charValue = '\'',
-                isFn = true,
+                isFn = !isEn || shiftState == ShiftState.OFF,
+                isAccent = isEn && shiftState != ShiftState.OFF,
                 rect = RectF(xOff + gap, y3, xOff + gap + sideW, y3 + rowH),
             ),
         )
         r3.forEachIndexed { i, c ->
-            val ch = if (shifted && lang == LanguageMode.EN) c.uppercaseChar() else c
+            val ch = if (isUpper) c.uppercaseChar() else c
             val x = xOff + gap * 2 + sideW + i * (kw1 + gap)
             keys.add(KeySpec(ch.toString(), "", KeyAction.CHAR, ch, rect = RectF(x, y3, x + kw1, y3 + rowH)))
         }
@@ -372,7 +395,7 @@ class KeyboardCanvasView(context: Context) : View(context) {
             val fm = textPaint.fontMetrics
             val cy = k.rect.centerY() - (fm.ascent + fm.descent) / 2f
             if (k.subLabel.isNotEmpty()) {
-                subPaint.color = theme.keySubText
+                subPaint.color = if (k.isAccent) 0xFFE2E8F0.toInt() else theme.keySubText
                 subPaint.textSize = 10.5f * density
                 canvas.drawText(k.subLabel, k.rect.centerX(), k.rect.top + 13f * density, subPaint)
                 canvas.drawText(k.label, k.rect.centerX(), cy + 5f * density, textPaint)
@@ -400,6 +423,11 @@ class KeyboardCanvasView(context: Context) : View(context) {
         }
     }
 
+    override fun onDetachedFromWindow() {
+        removeCallbacks(shiftLongPressRunnable)
+        super.onDetachedFromWindow()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -408,7 +436,12 @@ class KeyboardCanvasView(context: Context) : View(context) {
                 lastSlideX = event.x
                 slidingCursor = false
                 swipedBackspace = false
+                shiftLongPressed = false
+                removeCallbacks(shiftLongPressRunnable)
                 pressedKey = findKey(event.x, event.y)
+                if (pressedKey?.action == KeyAction.SHIFT && lang == LanguageMode.EN) {
+                    postDelayed(shiftLongPressRunnable, 420L)
+                }
                 if (pressedKey != null && hapticEnabled) {
                     performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 }
@@ -418,6 +451,9 @@ class KeyboardCanvasView(context: Context) : View(context) {
             MotionEvent.ACTION_MOVE -> {
                 val pk = pressedKey ?: return true
                 val dx = event.x - lastSlideX
+                if (pk.action == KeyAction.SHIFT && !pk.rect.contains(event.x, event.y)) {
+                    removeCallbacks(shiftLongPressRunnable)
+                }
                 if (pk.action == KeyAction.SPACE && abs(event.x - downX) > 18f * density) {
                     slidingCursor = true
                     val step = 14f * density
@@ -433,15 +469,17 @@ class KeyboardCanvasView(context: Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                removeCallbacks(shiftLongPressRunnable)
                 val pk = pressedKey
                 pressedKey = null
                 invalidate()
-                if (pk != null && !slidingCursor && !swipedBackspace) {
+                if (pk != null && !slidingCursor && !swipedBackspace && !(pk.action == KeyAction.SHIFT && shiftLongPressed)) {
                     dispatchKey(pk)
                 }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(shiftLongPressRunnable)
                 pressedKey = null
                 invalidate()
                 return true
@@ -454,8 +492,8 @@ class KeyboardCanvasView(context: Context) : View(context) {
         when (k.action) {
             KeyAction.CHAR -> {
                 listener?.onChar(k.charValue)
-                if (shifted && lang == LanguageMode.EN) {
-                    shifted = false
+                if (shiftState == ShiftState.ONCE && lang == LanguageMode.EN) {
+                    shiftState = ShiftState.OFF
                     rebuildKeys()
                     invalidate()
                 }
@@ -465,7 +503,17 @@ class KeyboardCanvasView(context: Context) : View(context) {
             KeyAction.ENTER -> listener?.onEnter()
             KeyAction.SPACE -> listener?.onSpace()
             KeyAction.SHIFT -> {
-                shifted = !shifted
+                val now = System.currentTimeMillis()
+                shiftState = when (shiftState) {
+                    ShiftState.OFF -> {
+                        lastShiftTapMs = now
+                        ShiftState.ONCE
+                    }
+                    ShiftState.ONCE -> {
+                        if (now - lastShiftTapMs <= 380L) ShiftState.LOCKED else ShiftState.OFF
+                    }
+                    ShiftState.LOCKED -> ShiftState.OFF
+                }
                 rebuildKeys()
                 invalidate()
             }

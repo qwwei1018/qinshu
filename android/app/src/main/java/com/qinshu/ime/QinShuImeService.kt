@@ -5,9 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -72,7 +75,24 @@ class QinShuImeService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setOnApplyWindowInsetsListener { v, insets ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val nav = insets.getInsets(
+                        WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout(),
+                    )
+                    v.setPadding(nav.left, 0, nav.right, nav.bottom)
+                }
+                insets
+            }
+            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    v.requestApplyInsets()
+                }
+                override fun onViewDetachedFromWindow(v: View) = Unit
+            })
+        }
         val bar = CandidateBarView(this).apply {
             listener = object : CandidateBarView.Listener {
                 override fun onCandidateClick(cand: Candidate, index: Int) = commitCandidate(cand, index)
@@ -402,10 +422,18 @@ class QinShuImeService : InputMethodService() {
 
     private fun applyCurrentTheme() {
         val t = currentTheme()
+        rootLayout?.setBackgroundColor(t.keyboardBg)
         candidateBar?.applyTheme(t)
         keyboardView?.applyTheme(t)
         emojiPanel?.applyTheme(t)
         clipboardPanel?.applyTheme(t)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val lightNav = t != com.qinshu.ime.config.QinTheme.DARK_SLATE
+            window?.window?.insetsController?.setSystemBarsAppearance(
+                if (lightNav) WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS else 0,
+                WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+            )
+        }
     }
 
     private fun applyDisplayPrefs() {
