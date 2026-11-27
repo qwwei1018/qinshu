@@ -90,10 +90,21 @@ class EmojiPanelView(
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f)
     }
 
+    private val tabRow = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding((2 * density).toInt(), 0, (2 * density).toInt(), 0)
+    }
+    private val tabScroll = HorizontalScrollView(context).apply {
+        isHorizontalScrollBarEnabled = false
+        layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+        addView(tabRow)
+    }
     private val tabBar = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, (38 * density).toInt())
+        layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, (46 * density).toInt())
+        setPadding((6 * density).toInt(), (4 * density).toInt(), (6 * density).toInt(), (4 * density).toInt())
     }
 
     init {
@@ -145,26 +156,56 @@ class EmojiPanelView(
 
     private fun renderTabs() {
         tabBar.removeAllViews()
-        addTab("返回", false) { listener?.onClose() }
+        tabRow.removeAllViews()
+
+        tabBar.addView(createPinnedBarButton("返回", 14f) { listener?.onClose() })
+        tabBar.addView(tabScroll)
         categories.forEachIndexed { idx, (name, _) ->
-            addTab(name, idx == activeCategory) {
+            addCategoryTab(name, idx == activeCategory) {
                 activeCategory = idx
                 skinBar.visibility = View.GONE
                 renderTabs()
                 renderCategory(idx)
             }
         }
-        addTab("⌫", false) { listener?.onBackspace() }
+        tabBar.addView(createPinnedBarButton("⌫", 18f) { listener?.onBackspace() })
     }
 
-    private fun addTab(label: String, selected: Boolean, onClick: () -> Unit) {
-        tabBar.addView(
+    private fun createPinnedBarButton(label: String, textSizeSp: Float, onClick: () -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp)
+            setTextColor(theme.keyText)
+            background = GradientDrawable().apply {
+                setColor(theme.keyFnBg)
+                cornerRadius = 8f * density
+            }
+            layoutParams = LayoutParams((58 * density).toInt(), LayoutParams.MATCH_PARENT).apply {
+                marginStart = (3 * density).toInt()
+                marginEnd = (3 * density).toInt()
+            }
+            setOnClickListener { onClick() }
+        }
+
+    private fun addCategoryTab(label: String, selected: Boolean, onClick: () -> Unit) {
+        tabRow.addView(
             TextView(context).apply {
                 text = label
                 gravity = Gravity.CENTER
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(if (selected) theme.keyAccentBg else theme.keySubText)
-                layoutParams = LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+                if (selected) {
+                    background = GradientDrawable().apply {
+                        setColor(theme.capsuleBg)
+                        cornerRadius = 8f * density
+                    }
+                }
+                setPadding((14 * density).toInt(), (6 * density).toInt(), (14 * density).toInt(), (6 * density).toInt())
+                layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT).apply {
+                    marginStart = (2 * density).toInt()
+                    marginEnd = (2 * density).toInt()
+                }
                 setOnClickListener { onClick() }
             },
         )

@@ -13,8 +13,8 @@ android {
         applicationId = "com.qinshu.ime"
         minSdk = 24
         targetSdk = 34
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 7)
-        versionName = System.getenv("APP_VERSION") ?: "1.1.5"
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 8)
+        versionName = System.getenv("APP_VERSION") ?: "1.1.6"
     }
 
     // 关键低内存配置：禁止压缩 qdict，确保 Android 直接零解压 FileChannel.map(READ_ONLY)

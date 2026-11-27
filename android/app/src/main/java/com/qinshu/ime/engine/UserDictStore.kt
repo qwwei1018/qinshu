@@ -116,6 +116,19 @@ class UserDictStore(context: Context) : SQLiteOpenHelper(context, DB_NAME, null,
         upsertBonus(source, ck, word, delta)
     }
 
+    /** 生词自动学习：把未入库的英文手打词按前 2-4 字母前缀与全词索引写入本地动态词频库 */
+    fun learnEnglishWord(word: String) {
+        val clean = word.trim().lowercase()
+        if (clean.length !in 2..32 || !clean.all { it in 'a'..'z' }) return
+        val maxPrefix = minOf(4, clean.length)
+        for (len in 2..maxPrefix) {
+            upsertBonus("english", clean.substring(0, len), clean, 700)
+        }
+        if (clean.length > 4) {
+            upsertBonus("english", clean, clean, 900)
+        }
+    }
+
     fun pinWord(source: String, code: String, word: String, pinned: Boolean) {
         val ck = code.lowercase().trim()
         val db = writableDatabase

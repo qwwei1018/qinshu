@@ -202,6 +202,7 @@ class QinShuImeService : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         engine.clear()
+        engine.resetPhraseContext()
         releaseOverlayPanels()
     }
 
@@ -258,10 +259,12 @@ class QinShuImeService : InputMethodService() {
                 val top = engine.query().candidates.firstOrNull()
                 if (top != null) commitCandidate(top, 0) else commitRawBuffer()
             }
+            engine.resetPhraseContext()
             currentInputConnection?.commitText(ch.toString(), 1)
             return
         }
         if (ch == '@' && !engine.hasBuffer()) {
+            engine.resetPhraseContext()
             currentInputConnection?.commitText("@", 1)
             return
         }
@@ -304,6 +307,7 @@ class QinShuImeService : InputMethodService() {
     private fun commitRawBuffer() {
         val raw = engine.getBuffer()
         engine.clear()
+        engine.resetPhraseContext()
         currentInputConnection?.commitText(raw, 1)
         keyboardView?.setT9Syllables(emptyList())
         refreshIdleBarIfNeeded()
@@ -331,6 +335,7 @@ class QinShuImeService : InputMethodService() {
 
     private fun toggleLanguageMode() {
         if (engine.hasBuffer()) commitRawBuffer()
+        engine.resetPhraseContext()
         engine.languageMode = if (engine.languageMode == LanguageMode.ZH) LanguageMode.EN else LanguageMode.ZH
         keyboardView?.setState(engine.layoutMode, engine.languageMode)
     }

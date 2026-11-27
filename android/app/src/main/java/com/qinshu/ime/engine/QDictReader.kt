@@ -95,6 +95,29 @@ class QDictReader private constructor(
     fun lookupEmoji(pinyinKey: String, limit: Int = 4): List<DictEntry> =
         lookupKeyTable(emojiCount, emojiKeyOff, emojiEntryOff, pinyinKey, limit)
 
+    fun lookupEnglishExact(word: String): DictEntry? {
+        if (word.isEmpty() || enCount == 0) return null
+        val target = word.lowercase().toByteArray(StandardCharsets.UTF_8)
+        var lo = 0
+        var hi = enCount - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val recOff = enOff + mid * 8
+            val sOff = buf.getInt(recOff)
+            val sLen = buf.getShort(recOff + 4).toInt() and 0xFFFF
+            val cmp = comparePoolBytes(sOff, sLen, target)
+            when {
+                cmp == 0 -> {
+                    val weight = buf.getShort(recOff + 6).toInt() and 0xFFFF
+                    return DictEntry(readPoolString(sOff, sLen), weight)
+                }
+                cmp < 0 -> lo = mid + 1
+                else -> hi = mid - 1
+            }
+        }
+        return null
+    }
+
     fun lookupEnglishPrefix(prefix: String, limit: Int = 12): List<DictEntry> {
         if (prefix.isEmpty() || enCount == 0) return emptyList()
         val target = prefix.lowercase().toByteArray(StandardCharsets.UTF_8)
@@ -113,7 +136,7 @@ class QDictReader private constructor(
         }
         val out = ArrayList<DictEntry>(limit)
         var idx = lo
-        val maxScan = 160
+        val maxScan = 400
         var scanned = 0
         while (idx < enCount && scanned < maxScan) {
             val recOff = enOff + idx * 8

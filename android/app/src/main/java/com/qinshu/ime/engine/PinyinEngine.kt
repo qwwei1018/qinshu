@@ -40,10 +40,19 @@ class PinyinEngine(
     private val buffer = StringBuilder()
     private var lockedT9Syllable: String? = null
     private var smartMode: String = ""
+    private var lastZhCode: String = ""
+    private var lastZhText: String = ""
+    private var lastZhTimeMs: Long = 0L
 
     fun getBuffer(): String = buffer.toString()
     fun hasBuffer(): Boolean = buffer.isNotEmpty()
     fun isSmartInputActive(): Boolean = smartMode.isNotEmpty()
+
+    fun resetPhraseContext() {
+        lastZhCode = ""
+        lastZhText = ""
+        lastZhTimeMs = 0L
+    }
 
     fun clear() {
         buffer.setLength(0)
@@ -98,12 +107,57 @@ class PinyinEngine(
 
     fun onCandidateSelected(cand: Candidate, index: Int) {
         when (cand.source) {
-            "pinyin", "t9", "english", "phrase", "command" -> {
-                val src = if (cand.source == "t9") "pinyin" else cand.source
-                userStore.boostSelection(src, cand.code, cand.text, index, 5)
+            "pinyin", "t9" -> {
+                userStore.boostSelection("pinyin", cand.code, cand.text, index, 5)
+                tryLearnChinesePhrase(cand)
             }
+            "english" -> {
+                resetPhraseContext()
+                userStore.boostSelection("english", cand.code, cand.text, index, 5)
+                val cleanEn = cand.text.trim()
+                if (cleanEn.length in 2..32 && cleanEn.all { it in 'a'..'z' || it in 'A'..'Z' }) {
+                    val lowEn = cleanEn.lowercase()
+                    if (dict.lookupEnglishExact(lowEn) == null) {
+                        userStore.learnEnglishWord(lowEn)
+                    }
+                }
+            }
+            "phrase", "command" -> {
+                resetPhraseContext()
+                userStore.boostSelection(cand.source, cand.code, cand.text, index, 5)
+            }
+            else -> resetPhraseContext()
         }
         clear()
+    }
+
+    private fun tryLearnChinesePhrase(cand: Candidate) {
+        val now = System.currentTimeMillis()
+        val text = cand.text
+        val code = cand.code.lowercase().replace("'", "")
+        if (text.isEmpty() || code.isEmpty() || !code.all { it in 'a'..'z' }) {
+            resetPhraseContext()
+            return
+        }
+        if (
+            !cand.composed &&
+            text.length in 1..3 &&
+            lastZhText.isNotEmpty() &&
+            lastZhCode.isNotEmpty() &&
+            now - lastZhTimeMs <= 12_000L &&
+            lastZhText.length + text.length in 2..4
+        ) {
+            val combinedText = lastZhText + text
+            val combinedCode = lastZhCode + code
+            userStore.boostSelection("pinyin", combinedCode, combinedText, 1, 5)
+        }
+        if (text.length in 1..2 && !cand.composed) {
+            lastZhCode = code
+            lastZhText = text
+            lastZhTimeMs = now
+        } else {
+            resetPhraseContext()
+        }
     }
 
     fun query(): EngineResult {
@@ -150,19 +204,55 @@ class PinyinEngine(
         SmartRecognizer.queryQuickCommands(low).forEach(::add)
 
         val userFreqs = userStore.getUserFreqs("english", low).associateBy { it.word.lowercase() }
-        dict.lookupEnglishPrefix(low, 14).forEach { e ->
-            val disp = when {
-                allUpper -> e.word.uppercase()
-                firstUpper -> e.word.replaceFirstChar { it.uppercase() }
-                else -> e.word
-            }
+        val dictHits = dict.lookupEnglishPrefix(low, 14)
+        dictHits.forEach { e ->
+            val disp = formatEnglishCase(e.word, allUpper, firstUpper)
             val uBonus = userFreqs[e.word.lowercase()]?.let { userStore.effectiveBonus(it) } ?: 0.0
             val exactBonus = if (e.word.equals(low, ignoreCase = true)) 1200.0 else 0.0
             add(Candidate(disp, low, "english", e.weight + uBonus + exactBonus, "En"))
         }
 
+        // 生词记忆回显（用户之前手打学习过的英文单词）
+        for ((w, item) in userFreqs) {
+            if (w.startsWith(low)) {
+                val disp = formatEnglishCase(w, allUpper, firstUpper)
+                add(Candidate(disp, low, "english", 3000.0 + userStore.effectiveBonus(item), "生词"))
+            }
+        }
+
+        // 英文拼写容错：相邻字母换位（teh -> the）与 26 键邻键纠错（hellp -> hello）
+        if (dictHits.size < 3 && low.length in 3..14 && low.all { it in 'a'..'z' }) {
+            for (i in 0 until low.length - 1) {
+                if (low[i] == low[i + 1]) continue
+                val swapped = low.substring(0, i) + low[i + 1] + low[i] + low.substring(i + 2)
+                dict.lookupEnglishExact(swapped)?.let { e ->
+                    val disp = formatEnglishCase(e.word, allUpper, firstUpper)
+                    add(Candidate(disp, low, "english", e.weight * 0.88 + 600.0, "纠错"))
+                }
+            }
+            var checked = 0
+            outer@ for (i in low.indices) {
+                val adj = FuzzyPinyin.adjacentKeys[low[i]] ?: continue
+                for (rep in adj) {
+                    val alt = low.substring(0, i) + rep + low.substring(i + 1)
+                    dict.lookupEnglishExact(alt)?.let { e ->
+                        val disp = formatEnglishCase(e.word, allUpper, firstUpper)
+                        add(Candidate(disp, low, "english", e.weight * 0.72, "纠错"))
+                    }
+                    if (++checked >= 24) break@outer
+                }
+            }
+        }
+
         return EngineResult(candidates = list.sortedByDescending { it.score }.take(20), composingDisplay = raw)
     }
+
+    private fun formatEnglishCase(word: String, allUpper: Boolean, firstUpper: Boolean): String =
+        when {
+            allUpper -> word.uppercase()
+            firstUpper -> word.replaceFirstChar { it.uppercase() }
+            else -> word
+        }
 
     private fun queryQwertyPinyin(raw: String): EngineResult {
         val code = raw.lowercase()
