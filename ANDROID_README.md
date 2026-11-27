@@ -11,14 +11,14 @@
 
 ## GitHub 自动打包与发布步骤
 
-1. 提交安卓端代码并推送到 GitHub `main` 分支（如需指定正式发布版本号，可同步打 `android-v1.1.3` 标签）：
+1. 提交安卓端代码并推送到 GitHub `main` 分支（如需指定正式发布版本号，可同步打 `android-v1.1.4` 标签）：
    ```bash
    git add cmd/dictbuild data/emoji_pinyin.txt android .github/workflows/build-android.yml ANDROID_README.md .gitignore
-   git commit -m "feat(android): add QinShu Android IME v1.1.3 & CI release workflow"
-   git tag -a android-v1.1.3 -m "Qin书输入法 Android v1.1.3"
+   git commit -m "feat(android): add QinShu Android IME v1.1.4 & CI release workflow"
+   git tag -a android-v1.1.4 -m "Qin书输入法 Android v1.1.4"
    git push origin main --tags
    ```
-2. GitHub Actions 将自动触发 **Build QinShu IME (Android APK)**，约 2–3 分钟后在仓库 **Releases** 与 **Actions Artifacts** 中生成可安装的 APK（如 `QinShu-IME-Android-android-v1.1.3.apk`）。
+2. GitHub Actions 将自动触发 **Build QinShu IME (Android APK)**，约 2–3 分钟后在仓库 **Releases** 与 **Actions Artifacts** 中生成可安装的 APK（如 `QinShu-IME-Android-android-v1.1.4.apk`）。
 3. （可选）如需使用自己的正式签名证书，在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 中添加以下 4 个 Secrets（未配置时默认使用调试签名，仍可直接安装体验）：
    - `ANDROID_KEYSTORE_BASE64`（`.jks` 文件的 Base64 编码）
    - `ANDROID_KEYSTORE_PASSWORD`

@@ -45,20 +45,24 @@ class EmojiPanelView(
     private val skinModifiers = arrayOf("", "\uD83C\uDFFB", "\uD83C\uDFFC", "\uD83C\uDFFD", "\uD83C\uDFFE", "\uD83C\uDFFF")
 
     private val quickSearchTags = listOf(
+        "捂脸" to "wulian", "抱拳" to "baoquan",
         "开心" to "kaixin", "哈哈" to "haha", "点赞" to "zan", "谢谢" to "xiexie",
         "加油" to "jiayou", "爱" to "ai", "哭" to "ku", "无语" to "wuyu",
         "发财" to "facai", "祝福" to "zhufu", "吃饭" to "chifan", "工作" to "gongzuo",
     )
 
+    private fun isDisplayableEmoji(s: String): Boolean =
+        s.startsWith("[") || glyphPaint.hasGlyph(s)
+
     private val categories: List<Pair<String, List<String>>> by lazy {
         listOf(
-            "常用" to listOf("😄", "😂", "🤣", "😊", "🥰", "😍", "😘", "😅", "😭", "🥺", "🙏", "👍", "👌", "💪", "🔥", "❤️", "🎉", "✨", "🤔", "😑", "🙄", "😱", "😴", "👋"),
-            "情绪" to listOf("😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🥵", "🥶", "😵", "🤯", "🥳", "😎", "🤓", "😕", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "😦", "😨", "😰", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😡", "😠", "🤬"),
-            "手势" to listOf("👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "🫶", "👐", "🤲", "🤝", "🙏", "💪", "👀", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "💕", "💖", "💯", "💢", "💥", "💦", "💤"),
+            "常用" to listOf("[捂脸]", "[抱拳]", "😄", "😂", "🤣", "😊", "🥰", "😍", "😘", "😅", "😭", "🥺", "🙏", "👍", "👌", "💪", "🔥", "❤️", "🎉", "✨", "🤔", "😑", "🙄", "😱", "😴", "👋"),
+            "情绪" to listOf("[捂脸]", "🤦", "🫣", "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🤫", "🤔", "🤐", "🤨", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "😌", "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🥵", "🥶", "😵", "🤯", "🥳", "😎", "🤓", "😕", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "😦", "😨", "😰", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "😤", "😡", "😠", "🤬"),
+            "手势" to listOf("[抱拳]", "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "🫶", "👐", "🤲", "🤝", "🙏", "💪", "👀", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "💕", "💖", "💯", "💢", "💥", "💦", "💤"),
             "生活" to listOf("🍚", "🍜", "🍲", "🍢", "🧋", "☕", "🍵", "🍺", "🍻", "🥂", "🎂", "🍰", "🍎", "🍉", "🍓", "🍊", "🍦", "📱", "💻", "📧", "📞", "⏰", "📅", "💼", "🏠", "🏢", "✈️", "🚄", "🚗", "📍", "🎁", "🧧", "💰", "📈", "📉", "🚀", "🏆", "🥇", "🎵", "🎬", "🎮", "📸", "⚽", "🏀", "🏃"),
             "自然" to listOf("☀️", "🌤️", "⛅", "🌧️", "⛈️", "🌩️", "❄️", "⛄", "🌈", "🔥", "💧", "🌊", "🌙", "⭐", "✨", "🌟", "🌸", "🌹", "🌺", "🌻", "🌳", "🍃", "🐱", "🐶", "🐼", "🐰", "🐷", "🐯", "🐉", "🐴", "🐑", "🐵", "🐔", "🐟"),
             "符号" to listOf("✅", "✔️", "❌", "❎", "⚠️", "❗", "❓", "💡", "🔍", "⚙️", "🔒", "🔑", "📌", "📝", "🗑️", "⏳", "🛑", "▶️", "🔄", "⬆️", "⬇️", "⬅️", "➡️", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"),
-        ).map { (name, list) -> name to list.filter { glyphPaint.hasGlyph(it) } }
+        ).map { (name, list) -> name to list.filter { isDisplayableEmoji(it) } }
     }
 
     private val searchRow = LinearLayout(context).apply {
@@ -131,7 +135,7 @@ class EmojiPanelView(
                     }
                     setOnClickListener {
                         skinBar.visibility = View.GONE
-                        val hits = dictReader.lookupEmoji(py, 16).map { it.word }.filter { glyphPaint.hasGlyph(it) }
+                        val hits = dictReader.lookupEmoji(py, 16).map { it.word }.filter { isDisplayableEmoji(it) }
                         if (hits.isNotEmpty()) bindGrid(hits)
                     }
                 },
@@ -168,7 +172,7 @@ class EmojiPanelView(
 
     private fun renderCategory(idx: Int) {
         val items = if (idx == 0) {
-            (prefs.getTopUsedEmojis(24) + categories[0].second).distinct().filter { glyphPaint.hasGlyph(it) }
+            (prefs.getTopUsedEmojis(24) + categories[0].second).distinct().filter { isDisplayableEmoji(it) }
         } else {
             categories[idx].second
         }
@@ -180,11 +184,24 @@ class EmojiPanelView(
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val tv = (convertView as? TextView) ?: TextView(context).apply {
                     gravity = Gravity.CENTER
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                    setPadding(0, (7 * density).toInt(), 0, (7 * density).toInt())
+                    maxLines = 1
                 }
                 val em = items[position]
                 tv.text = em
+                if (em.startsWith("[")) {
+                    tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10.5f)
+                    tv.setTextColor(theme.capsuleText)
+                    tv.background = GradientDrawable().apply {
+                        setColor(theme.capsuleBg)
+                        cornerRadius = 8f * density
+                    }
+                    tv.setPadding((2 * density).toInt(), (9 * density).toInt(), (2 * density).toInt(), (9 * density).toInt())
+                } else {
+                    tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                    tv.setTextColor(theme.keyText)
+                    tv.background = null
+                    tv.setPadding(0, (7 * density).toInt(), 0, (7 * density).toInt())
+                }
                 tv.setOnClickListener {
                     skinBar.visibility = View.GONE
                     prefs.recordEmojiUse(em)
