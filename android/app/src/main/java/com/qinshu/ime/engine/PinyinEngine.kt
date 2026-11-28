@@ -270,12 +270,13 @@ class PinyinEngine(
         val variants = FuzzyPinyin.expandQuery(code, fuzzyEnabled, fuzzyRules, 20)
         for (v in variants) {
             val isExact = v.weight >= 0.99
-            val exactBoost = if (isExact) 6000.0 else 0.0
+            // 精确与模糊变体统一基准加分：不额外奖励精确匹配，
+            // 否则生僻精确字会全面压制高频模糊词（输入 si 打不出「是」）。
             val userMap = userStore.getUserFreqs("pinyin", v.fullKey).associateBy { it.word }
-            val entries = dict.lookupPinyin(v.fullKey, if (isExact) 30 else 10)
+            val entries = dict.lookupPinyin(v.fullKey, if (isExact) 30 else 16)
             for (e in entries) {
                 val uBonus = userMap[e.word]?.let { userStore.effectiveBonus(it) } ?: 0.0
-                val score = (e.weight + uBonus + exactBoost) * v.weight
+                val score = (e.weight + uBonus) * v.weight + PINYIN_BASE_BONUS
                 putBest(Candidate(e.word, v.fullKey, "pinyin", score))
             }
             for ((w, item) in userMap) {
@@ -310,10 +311,14 @@ class PinyinEngine(
         }
 
         if (cleanKey.length in 2..5) {
-            val jpUser = userStore.getUserFreqs("pinyin", cleanKey).associateBy { it.word }
-            dict.lookupInitials(cleanKey, 12).forEach { e ->
-                val uBonus = jpUser[e.word]?.let { userStore.effectiveBonus(it) } ?: 0.0
-                putBest(Candidate(e.word, cleanKey, "pinyin", e.weight * 0.62 + uBonus))
+            // 简拼同样支持模糊音（l_n / f_h / r_l / k_g 等首字母不同的规则）
+            val initVars = FuzzyPinyin.expandInitials(cleanKey, fuzzyEnabled, fuzzyRules, 8)
+            for ((ik, iw) in initVars) {
+                val jpUser = userStore.getUserFreqs("pinyin", ik).associateBy { it.word }
+                dict.lookupInitials(ik, if (iw >= 0.99) 12 else 6).forEach { e ->
+                    val uBonus = jpUser[e.word]?.let { userStore.effectiveBonus(it) } ?: 0.0
+                    putBest(Candidate(e.word, ik, "pinyin", (e.weight * 0.62 + uBonus) * iw))
+                }
             }
         }
 
@@ -384,8 +389,13 @@ class PinyinEngine(
             if (prev == null || c.score > prev.score) resMap[c.text] = c
         }
 
-        dict.lookupT9(digits, 15).forEach { e ->
-            putBest(Candidate(e.word, digits, "t9", e.weight.toDouble() + 5000.0))
+        // 九宫格 T9 模糊音展开：74 -> si/shi(744)，526 -> lan/nan(626)
+        val t9Variants = FuzzyPinyin.expandT9Digits(digits, fuzzyEnabled, fuzzyRules, 12)
+        for ((t9Key, t9W) in t9Variants) {
+            val isExact = t9W >= 0.99
+            dict.lookupT9(t9Key, if (isExact) 15 else 8).forEach { e ->
+                putBest(Candidate(e.word, t9Key, "t9", e.weight.toDouble() * t9W + T9_BASE_BONUS))
+            }
         }
 
         if (digits.length >= 4 && resMap.size < 6) {
@@ -400,9 +410,12 @@ class PinyinEngine(
             }
         }
 
+        // 左侧音节同步做模糊音展开
         sylList.take(3).forEach { syl ->
-            dict.lookupPinyin(syl, 4).forEach { e ->
-                putBest(Candidate(e.word, syl, "t9", e.weight * 0.5))
+            FuzzyPinyin.expandSyllable(syl, fuzzyEnabled, fuzzyRules).take(4).forEach { fv ->
+                dict.lookupPinyin(fv.fullKey, 4).forEach { e ->
+                    putBest(Candidate(e.word, fv.fullKey, "t9", e.weight * 0.5 * fv.weight))
+                }
             }
         }
 
@@ -427,18 +440,40 @@ class PinyinEngine(
             if (dpScore[i] < 0) continue
             val maxSpan = minOf(4, n - i)
             for (span in maxSpan downTo 1) {
-                val key = syls.subList(i, i + span).joinToString("")
-                val top = dict.lookupPinyin(key, 1).firstOrNull() ?: continue
+                val subSyls = syls.subList(i, i + span)
+                val rawKey = subSyls.joinToString("")
+                var bestWord: String? = null
+                var bestWeight = -1.0
+
+                dict.lookupPinyin(rawKey, 1).firstOrNull()?.let {
+                    bestWord = it.word
+                    bestWeight = it.weight.toDouble()
+                }
+                // 整句 DP 同步接入模糊音变体查找，否则「我是南方人」会被拼成「我司蓝放人」
+                if (fuzzyEnabled) {
+                    val fuzzyVars = FuzzyPinyin.expandQuery(subSyls.joinToString("'"), true, fuzzyRules, 6)
+                    for (fv in fuzzyVars) {
+                        if (fv.fullKey == rawKey) continue
+                        val hit = dict.lookupPinyin(fv.fullKey, 1).firstOrNull() ?: continue
+                        val w = hit.weight * fv.weight
+                        if (w > bestWeight) {
+                            bestWeight = w
+                            bestWord = hit.word
+                        }
+                    }
+                }
+                val word = bestWord ?: continue
                 val spanBonus = when (span) {
                     2 -> 4000.0
                     3 -> 8500.0
                     4 -> 13000.0
                     else -> 0.0
                 }
-                val nextScore = dpScore[i] + top.weight + spanBonus
+                // 跨度奖励不参与模糊权重衰减，保证多字词（我是 / 南方）优先于单字拼凑
+                val nextScore = dpScore[i] + bestWeight + spanBonus
                 if (nextScore > dpScore[i + span]) {
                     dpScore[i + span] = nextScore
-                    dpText[i + span] = dpText[i] + top.word
+                    dpText[i + span] = dpText[i] + word
                 }
             }
         }
@@ -468,5 +503,13 @@ class PinyinEngine(
         }
         val finalStr = dpText[n] ?: return null
         return if (finalStr.isNotEmpty()) finalStr to dpScore[n] else null
+    }
+
+    private companion object {
+        /** 拼音词条统一基准加分（对应桌面端 dict.pinyinBaseBonus），精确/模糊变体一视同仁。 */
+        const val PINYIN_BASE_BONUS = 800.0
+
+        /** 九宫格 T9 键基准加分：对所有模糊变体键统一生效，避免只有精确数字串才能出候选。 */
+        const val T9_BASE_BONUS = 5000.0
     }
 }

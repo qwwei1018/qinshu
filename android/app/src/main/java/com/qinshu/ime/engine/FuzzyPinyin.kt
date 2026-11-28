@@ -13,6 +13,15 @@ object FuzzyPinyin {
 
     data class FuzzyPair(val rule: String, val a: String, val b: String)
 
+    /**
+     * 模糊音变体权重：用户开启模糊音即表示认为两个读音等价，
+     * 因此只保留极小的降权用于同频打平，排序主要由词频决定，
+     * 避免开启模糊音后高频词（si -> 是、lan -> 南）被生僻精确字压到后排。
+     */
+    private const val INITIAL_FUZZY_WEIGHT = 0.96
+    private const val FINAL_FUZZY_WEIGHT = 0.96
+    private const val INITIALS_FUZZY_WEIGHT = 0.85
+
     val initialPairs = listOf(
         FuzzyPair("z_zh", "z", "zh"),
         FuzzyPair("c_ch", "c", "ch"),
@@ -141,19 +150,19 @@ object FuzzyPinyin {
             val iniVars = mutableListOf(ini to 1.0)
             for (p in initialPairs) {
                 if (rules[p.rule] != true) continue
-                if (ini == p.a) iniVars.add(p.b to 0.72)
-                else if (ini == p.b) iniVars.add(p.a to 0.72)
+                if (ini == p.a) iniVars.add(p.b to INITIAL_FUZZY_WEIGHT)
+                else if (ini == p.b) iniVars.add(p.a to INITIAL_FUZZY_WEIGHT)
             }
             val finVars = mutableListOf(fin to 1.0)
             for (p in finalPairs) {
                 if (rules[p.rule] != true) continue
                 when {
-                    fin == p.a -> finVars.add(p.b to 0.75)
-                    fin == p.b -> finVars.add(p.a to 0.75)
+                    fin == p.a -> finVars.add(p.b to FINAL_FUZZY_WEIGHT)
+                    fin == p.b -> finVars.add(p.a to FINAL_FUZZY_WEIGHT)
                     (p.rule == "an_ang" || p.rule == "en_eng" || p.rule == "in_ing") && fin.endsWith(p.a) ->
-                        finVars.add(fin.dropLast(p.a.length) + p.b to 0.75)
+                        finVars.add(fin.dropLast(p.a.length) + p.b to FINAL_FUZZY_WEIGHT)
                     (p.rule == "an_ang" || p.rule == "en_eng" || p.rule == "in_ing") && fin.endsWith(p.b) ->
-                        finVars.add(fin.dropLast(p.b.length) + p.a to 0.75)
+                        finVars.add(fin.dropLast(p.b.length) + p.a to FINAL_FUZZY_WEIGHT)
                 }
             }
             for ((iv, iw) in iniVars) {
@@ -278,5 +287,141 @@ object FuzzyPinyin {
             .map { QueryVariant(it.first.joinToString(""), it.first, it.second) }
             .sortedWith(compareByDescending<QueryVariant> { it.weight }.thenBy { it.syllables.size })
             .take(maxVariants)
+    }
+
+    /**
+     * 九宫格 T9 模糊音展开：
+     * 将 T9 数字串切分为合法单音节 -> 对音节做模糊音展开 -> 映射回对应的 T9 数字串。
+     * 例如开启 s_sh 时，"74"(si) 会展开出 "744"(shi)；开启 l_n 时，"526"(lan) 会展开出 "626"(nan)。
+     */
+    fun expandT9Digits(
+        digits: String,
+        enabled: Boolean,
+        rules: Map<String, Boolean>,
+        maxVariants: Int = 16,
+    ): List<Pair<String, Double>> {
+        val clean = digits.replace("'", "")
+        if (clean.isEmpty()) return emptyList()
+        if (!enabled) return listOf(clean to 1.0)
+
+        val out = LinkedHashMap<String, Double>()
+        out[clean] = 1.0
+
+        // 单音节直接映射（如 74 -> si -> shi -> 744）
+        t9ToSyllables[clean]?.forEach { syl ->
+            expandSyllable(syl, true, rules)
+                .filter { validSyllables.contains(it.fullKey) }
+                .forEach { v ->
+                    // 只保留完整合法音节，避免 "7"(p/q/r/s) 被展开成 "74"(sh) 这类半截音节键
+                    val t9 = stringToT9(v.fullKey)
+                    if (t9.isNotEmpty() && (out[t9] ?: 0.0) < v.weight) out[t9] = v.weight
+                }
+        }
+
+        // 多音节 T9 串（最多切分前 3 条路径）
+        if (clean.length >= 3) {
+            for (path in segmentT9(clean, 3)) {
+                var cur = listOf("" to 1.0)
+                for (seg in path) {
+                    val segAlts = LinkedHashMap<String, Double>()
+                    segAlts[seg] = 1.0
+                    t9ToSyllables[seg]?.take(4)?.forEach { syl ->
+                        expandSyllable(syl, true, rules)
+                            .take(4)
+                            .filter { validSyllables.contains(it.fullKey) }
+                            .forEach { v ->
+                                val t9 = stringToT9(v.fullKey)
+                                if (t9.isNotEmpty() && (segAlts[t9] ?: 0.0) < v.weight) segAlts[t9] = v.weight
+                            }
+                    }
+                    val next = ArrayList<Pair<String, Double>>()
+                    for ((prefix, pw) in cur) {
+                        for ((alt, aw) in segAlts) {
+                            next.add((prefix + alt) to (pw * aw))
+                        }
+                    }
+                    next.sortByDescending { it.second }
+                    cur = if (next.size > maxVariants) next.subList(0, maxVariants) else next
+                }
+                for ((k, w) in cur) {
+                    if ((out[k] ?: 0.0) < w) out[k] = w
+                }
+            }
+        }
+
+        return out.entries
+            .map { it.key to it.value }
+            .sortedByDescending { it.second }
+            .take(maxVariants)
+    }
+
+    private fun segmentT9(digits: String, maxPaths: Int): List<List<String>> {
+        val n = digits.length
+        val res = ArrayList<List<String>>()
+        val acc = ArrayList<String>()
+        fun dfs(pos: Int) {
+            if (res.size >= maxPaths) return
+            if (pos == n) {
+                res.add(ArrayList(acc))
+                return
+            }
+            val maxLen = minOf(6, n - pos)
+            for (len in maxLen downTo 1) {
+                val sub = digits.substring(pos, pos + len)
+                if (t9ToSyllables.containsKey(sub)) {
+                    acc.add(sub)
+                    dfs(pos + len)
+                    acc.removeAt(acc.size - 1)
+                    if (res.size >= maxPaths) return
+                }
+            }
+        }
+        dfs(0)
+        return res
+    }
+
+    /**
+     * 简拼首字母模糊展开（针对首字母不同的 l/n、f/h、r/l、k/g 规则）。
+     * 例如开启 l_n 时，"ln" 会同时产出 "nl"、"nn"、"ll"，用于命中「能力 / 年龄」。
+     */
+    fun expandInitials(
+        initials: String,
+        enabled: Boolean,
+        rules: Map<String, Boolean>,
+        maxVariants: Int = 12,
+    ): List<Pair<String, Double>> {
+        val s = initials.lowercase()
+        if (s.isEmpty()) return emptyList()
+        if (!enabled) return listOf(s to 1.0)
+
+        val charAlts = HashMap<Char, MutableList<Char>>()
+        fun link(rule: String, a: Char, b: Char) {
+            if (rules[rule] == true) {
+                charAlts.getOrPut(a) { ArrayList() }.add(b)
+                charAlts.getOrPut(b) { ArrayList() }.add(a)
+            }
+        }
+        link("l_n", 'l', 'n')
+        link("f_h", 'f', 'h')
+        link("r_l", 'r', 'l')
+        link("k_g", 'k', 'g')
+        if (charAlts.isEmpty()) return listOf(s to 1.0)
+
+        var cur = listOf("" to 1.0)
+        for (ch in s) {
+            val next = ArrayList<Pair<String, Double>>()
+            val alts = charAlts[ch]
+            for ((prefix, pw) in cur) {
+                next.add((prefix + ch) to pw)
+                alts?.forEach { alt -> next.add((prefix + alt) to (pw * INITIALS_FUZZY_WEIGHT)) }
+            }
+            next.sortByDescending { it.second }
+            cur = if (next.size > maxVariants) next.subList(0, maxVariants) else next
+        }
+        val best = LinkedHashMap<String, Double>()
+        for ((k, w) in cur) {
+            if ((best[k] ?: 0.0) < w) best[k] = w
+        }
+        return best.entries.map { it.key to it.value }.sortedByDescending { it.second }
     }
 }

@@ -3,6 +3,7 @@ package com.qinshu.ime
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.os.Build
@@ -32,6 +33,7 @@ import com.qinshu.ime.ui.CandidateBarView
 import com.qinshu.ime.ui.ClipboardPanelView
 import com.qinshu.ime.ui.EmojiPanelView
 import com.qinshu.ime.ui.KeyboardCanvasView
+import com.qinshu.ime.ui.SymbolPanelView
 
 class QinShuImeService : InputMethodService() {
 
@@ -47,11 +49,27 @@ class QinShuImeService : InputMethodService() {
     private var keyboardView: KeyboardCanvasView? = null
     private var emojiPanel: EmojiPanelView? = null
     private var clipboardPanel: ClipboardPanelView? = null
+    private var symbolPanel: SymbolPanelView? = null
 
-    private var activePanel: String = "keyboard" // "keyboard" | "emoji" | "clipboard"
+    private var activePanel: String = "keyboard" // "keyboard" | "emoji" | "clipboard" | "symbol"
     private var lastClipSignature: String = ""
     private val activeCapsules = ArrayList<SmartCapsule>(4)
     private var isPasswordField = false
+
+    /** 成对符号上屏后自动把光标移入中间 */
+    private val pairedSymbols = setOf(
+        "“”", "‘’", "（）", "【】", "《》", "「」", "『』", "〈〉",
+        "()", "[]", "{}", "<>", "''", "\"\"",
+    )
+
+    /** 设置页修改模糊音总开关/细项后立即热更新引擎，无需重新聚焦输入框或重启输入法 */
+    private val spListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "fuzzy_enabled" || key?.startsWith("fuzzy_") == true) {
+            engine.fuzzyEnabled = prefs.fuzzyEnabled
+            engine.fuzzyRules = prefs.getFuzzyRules()
+            if (engine.hasBuffer()) updateCandidatesFromEngine()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -72,6 +90,7 @@ class QinShuImeService : InputMethodService() {
                 refreshIdleBarIfNeeded()
             }
         }
+        prefs.registerOnChangeListener(spListener)
     }
 
     override fun onCreateInputView(): View {
@@ -111,6 +130,7 @@ class QinShuImeService : InputMethodService() {
                     refreshIdleBarIfNeeded()
                 }
                 override fun onOpenEmoji() = toggleOverlayPanel("emoji")
+                override fun onOpenSymbol() = toggleOverlayPanel("symbol")
                 override fun onOpenClipboard() = toggleOverlayPanel("clipboard")
                 override fun onToggleLayout() = toggleLayoutMode()
                 override fun onOpenSettings() {
@@ -142,6 +162,7 @@ class QinShuImeService : InputMethodService() {
                 override fun onToggleLanguage() = toggleLanguageMode()
                 override fun onToggleLayout() = toggleLayoutMode()
                 override fun onToggleEmojiPanel() = toggleOverlayPanel("emoji")
+                override fun onToggleSymbolPanel() = toggleOverlayPanel("symbol")
                 override fun onSelectT9Syllable(syl: String) {
                     engine.lockT9Syllable(syl)
                     updateCandidatesFromEngine()
@@ -216,6 +237,7 @@ class QinShuImeService : InputMethodService() {
 
     override fun onDestroy() {
         SmartCapsuleBus.setListener(null)
+        if (::prefs.isInitialized) prefs.unregisterOnChangeListener(spListener)
         dictReader.close()
         userStore.close()
         super.onDestroy()
@@ -248,12 +270,20 @@ class QinShuImeService : InputMethodService() {
             currentInputConnection?.commitText(ch.toString(), 1)
             return
         }
-        val isDirectPunct = ch in "，。？！、；：," || (
-            ch == '.' &&
-                !engine.numMode &&
-                !engine.isSmartInputActive() &&
-                !engine.getBuffer().equals("www", ignoreCase = true)
+        // 数字/算式页的运算字符、智能邮箱网址模式的地址字符、以及拼音分词符交给引擎
+        val isCalcChar = engine.numMode && (ch.isDigit() || ch in "+-*/%=.()")
+        val isSmartAddrChar = engine.isSmartInputActive() && (
+            ch.isLetterOrDigit() || ch in ".:/@-_?=&%#~+"
             )
+        val isCalcOrSmartChar = isCalcChar ||
+            isSmartAddrChar ||
+            (ch == '.' && engine.getBuffer().equals("www", ignoreCase = true)) ||
+            (ch == ':' && engine.getBuffer().lowercase() in setOf("http", "https", "ftp")) ||
+            (ch == '@' && engine.hasBuffer()) ||
+            ch == '\''
+        val isLetterOrDigit = ch in 'a'..'z' || ch in 'A'..'Z' || ch in '0'..'9'
+        // 放开全部非字母数字标点直出，避免 «÷ ≥ ％ 等标点被误塞进拼音缓冲
+        val isDirectPunct = !isLetterOrDigit && !isCalcOrSmartChar
         if (isDirectPunct) {
             if (engine.hasBuffer()) {
                 val top = engine.query().candidates.firstOrNull()
@@ -272,6 +302,39 @@ class QinShuImeService : InputMethodService() {
         currentInputConnection?.setComposingText(res.composingDisplay.ifEmpty { engine.getBuffer() }, 1)
         candidateBar?.showCandidates(res.candidates, res.composingDisplay)
         keyboardView?.setT9Syllables(res.t9Syllables)
+    }
+
+    /** 符号面板上屏：先把待选拼音词落屏，成对符号自动把光标移入中间 */
+    private fun commitSymbol(symbol: String, autoClose: Boolean) {
+        // 数字/算式页：数学符号进入算式缓冲（如 200*15%），而不是当普通文本直出
+        if (engine.numMode) {
+            val calc = when (symbol) {
+                "×" -> "*"
+                "÷" -> "/"
+                "＋" -> "+"
+                "－" -> "-"
+                "＝" -> "="
+                "％" -> "%"
+                else -> symbol
+            }
+            if (calc.length == 1 && calc[0] in "+-*/%=.()") {
+                val res = engine.appendChar(calc[0])
+                currentInputConnection?.setComposingText(res.composingDisplay.ifEmpty { engine.getBuffer() }, 1)
+                candidateBar?.showCandidates(res.candidates, res.composingDisplay)
+                if (autoClose) showKeyboardOnly()
+                return
+            }
+        }
+        if (engine.hasBuffer()) {
+            val top = engine.query().candidates.firstOrNull()
+            if (top != null) commitCandidate(top, 0) else commitRawBuffer()
+        }
+        engine.resetPhraseContext()
+        currentInputConnection?.commitText(symbol, 1)
+        if (symbol in pairedSymbols) {
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DPAD_LEFT)
+        }
+        if (autoClose) showKeyboardOnly()
     }
 
     private fun handleBackspace() {
@@ -356,6 +419,7 @@ class QinShuImeService : InputMethodService() {
         keyboardView?.visibility = View.GONE
         emojiPanel?.visibility = View.GONE
         clipboardPanel?.visibility = View.GONE
+        symbolPanel?.visibility = View.GONE
 
         if (target == "emoji") {
             val panel = emojiPanel ?: EmojiPanelView(this, dictReader, prefs).apply {
@@ -394,6 +458,18 @@ class QinShuImeService : InputMethodService() {
             panel.setItems(if (isPasswordField) emptyList() else clipboardStore.getAll())
             if (panel.parent == null) container.addView(panel)
             panel.visibility = View.VISIBLE
+        } else if (target == "symbol") {
+            val panel = symbolPanel ?: SymbolPanelView(this).apply {
+                applyTheme(currentTheme())
+                listener = object : SymbolPanelView.Listener {
+                    override fun onSymbolSelected(symbol: String, autoClose: Boolean) = commitSymbol(symbol, autoClose)
+                    override fun onClose() = showKeyboardOnly()
+                    override fun onBackspace() = handleBackspace()
+                }
+                symbolPanel = this
+            }
+            if (panel.parent == null) container.addView(panel)
+            panel.visibility = View.VISIBLE
         }
         activePanel = target
     }
@@ -401,6 +477,7 @@ class QinShuImeService : InputMethodService() {
     private fun showKeyboardOnly() {
         emojiPanel?.visibility = View.GONE
         clipboardPanel?.visibility = View.GONE
+        symbolPanel?.visibility = View.GONE
         keyboardView?.visibility = View.VISIBLE
         activePanel = "keyboard"
     }
@@ -409,8 +486,10 @@ class QinShuImeService : InputMethodService() {
         activePanel = "keyboard"
         emojiPanel?.let { (it.parent as? FrameLayout)?.removeView(it) }
         clipboardPanel?.let { (it.parent as? FrameLayout)?.removeView(it) }
+        symbolPanel?.let { (it.parent as? FrameLayout)?.removeView(it) }
         emojiPanel = null
         clipboardPanel = null
+        symbolPanel = null
         keyboardView?.visibility = View.VISIBLE
     }
 
@@ -432,6 +511,7 @@ class QinShuImeService : InputMethodService() {
         keyboardView?.applyTheme(t)
         emojiPanel?.applyTheme(t)
         clipboardPanel?.applyTheme(t)
+        symbolPanel?.applyTheme(t)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val lightNav = t != com.qinshu.ime.config.QinTheme.DARK_SLATE
             window?.window?.insetsController?.setSystemBarsAppearance(

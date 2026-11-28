@@ -153,4 +153,13 @@ class PrefsManager(context: Context) {
     fun setFuzzyRule(rule: String, enabled: Boolean) {
         sp.edit().putBoolean("fuzzy_$rule", enabled).apply()
     }
+
+    /** 注册/注销设置项变更监听（输入法服务据此实现模糊音等开关的热更新）。 */
+    fun registerOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sp.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterOnChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        sp.unregisterOnSharedPreferenceChangeListener(listener)
+    }
 }

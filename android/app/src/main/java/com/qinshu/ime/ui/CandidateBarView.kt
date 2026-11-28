@@ -13,7 +13,7 @@ import com.qinshu.ime.engine.Candidate
 import com.qinshu.ime.engine.SmartCapsule
 
 /**
- * 顶部候选栏 + 智能胶囊栏（验证码 / 网址 / Email / 手机号 / 单号 一键直填 + 剪贴板面板入口）。
+ * 顶部候选栏 + 智能胶囊栏（验证码 / 网址 / Email / 手机号 / 单号 一键直填 + 剪贴板 / 符号面板入口）。
  */
 class CandidateBarView(context: Context) : LinearLayout(context) {
 
@@ -22,6 +22,7 @@ class CandidateBarView(context: Context) : LinearLayout(context) {
         fun onCandidateLongClick(cand: Candidate)
         fun onCapsuleClick(capsule: SmartCapsule)
         fun onOpenEmoji()
+        fun onOpenSymbol()
         fun onOpenClipboard()
         fun onToggleLayout()
         fun onOpenSettings()
@@ -115,6 +116,7 @@ class CandidateBarView(context: Context) : LinearLayout(context) {
         }
 
         addToolChip("📋 剪贴板") { listener?.onOpenClipboard() }
+        addToolChip("符 符号") { listener?.onOpenSymbol() }
         addToolChip("😊 微表情") { listener?.onOpenEmoji() }
         addToolChip("⌨️ 9/26键") { listener?.onToggleLayout() }
         addToolChip("⚙️ 设置") { listener?.onOpenSettings() }

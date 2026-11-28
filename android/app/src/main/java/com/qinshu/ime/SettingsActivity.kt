@@ -82,11 +82,36 @@ class SettingsActivity : Activity() {
             isChecked = prefs.layoutMode == LayoutMode.T9
             setOnCheckedChangeListener { _, c -> prefs.layoutMode = if (c) LayoutMode.T9 else LayoutMode.QWERTY }
         })
+        // 模糊音总开关 + 12 组细项开关（修改后输入法内实时生效，无需重新切换输入框）
+        val fuzzyDetailBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = if (prefs.fuzzyEnabled) View.VISIBLE else View.GONE
+            setPadding((16 * d).toInt(), 0, 0, (8 * d).toInt())
+        }
+        val fuzzyRuleLabels = listOf(
+            "z_zh" to "z ↔ zh", "c_ch" to "c ↔ ch", "s_sh" to "s ↔ sh",
+            "l_n" to "l ↔ n", "f_h" to "f ↔ h", "r_l" to "r ↔ l", "k_g" to "k ↔ g",
+            "an_ang" to "an ↔ ang", "en_eng" to "en ↔ eng", "in_ing" to "in ↔ ing",
+            "ian_iang" to "ian ↔ iang", "uan_uang" to "uan ↔ uang",
+        )
         root.addView(Switch(this).apply {
             text = "开启拼音模糊音（平翘舌 / 前后鼻音 / l-n）"
             isChecked = prefs.fuzzyEnabled
-            setOnCheckedChangeListener { _, c -> prefs.fuzzyEnabled = c }
+            setOnCheckedChangeListener { _, c ->
+                prefs.fuzzyEnabled = c
+                fuzzyDetailBox.visibility = if (c) View.VISIBLE else View.GONE
+            }
         })
+        val currentRules = prefs.getFuzzyRules()
+        fuzzyRuleLabels.forEach { (ruleKey, title) ->
+            fuzzyDetailBox.addView(Switch(this).apply {
+                text = "模糊音：$title"
+                textSize = 13f
+                isChecked = currentRules[ruleKey] == true
+                setOnCheckedChangeListener { _, checked -> prefs.setFuzzyRule(ruleKey, checked) }
+            })
+        }
+        root.addView(fuzzyDetailBox)
         root.addView(Switch(this).apply {
             text = "拼音候选栏智能联想微表情（Emoji）"
             isChecked = prefs.emojiSuggestionEnabled

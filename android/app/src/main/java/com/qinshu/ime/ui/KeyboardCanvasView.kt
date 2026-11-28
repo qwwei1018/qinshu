@@ -19,7 +19,7 @@ enum class ShiftState { OFF, ONCE, LOCKED }
 
 enum class KeyAction {
     CHAR, BACKSPACE, ENTER, SPACE, SHIFT,
-    SWITCH_LANG, SWITCH_LAYOUT, SWITCH_NUM, SWITCH_EMOJI,
+    SWITCH_LANG, SWITCH_LAYOUT, SWITCH_NUM, SWITCH_EMOJI, SWITCH_SYMBOL,
     CLEAR_BUFFER, T9_SYLLABLE, EXIT_ONE_HANDED,
 }
 
@@ -36,7 +36,7 @@ data class KeySpec(
 /**
  * 超低内存单视图 Canvas 自绘键盘（v1.1 升级版）：
  * - 新增：键盘高度自定义（80%–125%）、左右单手模式缩进、零额外 View 的按键放大气泡预览
- * - 新增：数字/算式页增加 '=' 与 '%' 快捷键（支持 200*15% 与 =1280 人民币大写）
+ * - 新增：数字/算式页增加 '=' 快捷键（支持 =1280 人民币大写）与「符号」面板入口
  * - 支持空格键左右滑动微调光标、退格键左滑快速清空缓冲
  */
 class KeyboardCanvasView(context: Context) : View(context) {
@@ -51,6 +51,7 @@ class KeyboardCanvasView(context: Context) : View(context) {
         fun onToggleLanguage()
         fun onToggleLayout()
         fun onToggleEmojiPanel()
+        fun onToggleSymbolPanel()
         fun onSelectT9Syllable(syl: String)
         fun onExitOneHanded()
         fun onNumPageChanged(isNumPage: Boolean) {}
@@ -345,8 +346,8 @@ class KeyboardCanvasView(context: Context) : View(context) {
         val kw = (w - gap * (cols + 1)) / cols
         val grid = arrayOf(
             arrayOf("(", "1", "2", "3", "+", "⌫"),
-            arrayOf(")", "4", "5", "6", "-", "%"),
-            arrayOf("@", "7", "8", "9", "×", "="),
+            arrayOf(")", "4", "5", "6", "-", "@"),
+            arrayOf("符号", "7", "8", "9", "×", "="),
             arrayOf("返回", "，", "0", ".", "/", "换行"),
         )
         for (r in 0 until rows) {
@@ -358,6 +359,7 @@ class KeyboardCanvasView(context: Context) : View(context) {
                     "⌫" -> KeySpec(lbl, "", KeyAction.BACKSPACE, isFn = true, rect = RectF(x, y, x + kw, y + rowH))
                     "返回" -> KeySpec(lbl, "", KeyAction.SWITCH_NUM, isFn = true, rect = RectF(x, y, x + kw, y + rowH))
                     "换行" -> KeySpec(lbl, "", KeyAction.ENTER, isAccent = true, rect = RectF(x, y, x + kw, y + rowH))
+                    "符号" -> KeySpec(lbl, "", KeyAction.SWITCH_SYMBOL, isFn = true, rect = RectF(x, y, x + kw, y + rowH))
                     else -> KeySpec(
                         label = lbl,
                         subLabel = if (lbl == "=") "大写" else "",
@@ -521,6 +523,7 @@ class KeyboardCanvasView(context: Context) : View(context) {
             KeyAction.SWITCH_LAYOUT -> listener?.onToggleLayout()
             KeyAction.SWITCH_NUM -> toggleNumPage(activeLayoutMode)
             KeyAction.SWITCH_EMOJI -> listener?.onToggleEmojiPanel()
+            KeyAction.SWITCH_SYMBOL -> listener?.onToggleSymbolPanel()
             KeyAction.T9_SYLLABLE -> listener?.onSelectT9Syllable(k.label)
             KeyAction.EXIT_ONE_HANDED -> listener?.onExitOneHanded()
         }
